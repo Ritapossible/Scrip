@@ -1,0 +1,13 @@
+node_modules/
+dist/
+out/
+cache/
+broadcast/
+
+# Never commit keys. .env.example carries the shape instead.
+.env
+.env.*
+!.env.example
+
+*.log
+.DS_Store

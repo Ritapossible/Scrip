@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scrip - machine-payable FXRP</title>
+    <meta
+      name="description"
+      content="Scrip is a payment rail that makes bridged XRP spendable by software. Agents pay per call in FXRP, priced in USD by Flare's FTSO, with no gas token."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <nav class="nav">
+        <div class="nav-mark">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="5" r="3" fill="#0FA968" />
+            <circle cx="12" cy="12" r="3.6" fill="#0B7A4B" />
+            <circle cx="12" cy="19" r="3" fill="#34E29B" />
+          </svg>
+          SCRIP
+        </div>
+        <div class="nav-links">
+          <a href="./docs">Docs</a>
+          <a href="https://github.com/Ritapossible/scrip">GitHub</a>
+        </div>
+      </nav>
+
+      <header class="hero">
+        <h1>Machine-Payable FXRP</h1>
+        <p class="sub">Priced in USD. Settled on Flare.</p>
+
+        <a class="cta" href="./docs">
+          Get Started
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M5 12h14M13 6l6 6-6 6"
+              stroke="currentColor"
+              stroke-width="2.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </a>
+
+        <p class="note">Gasless for the agent. No FLR required.</p>
+      </header>
+
+      <!-- Live figures are wired to the facilitator on day 3. Until then these
+           are illustrative and must not be presented as live in the demo. -->
+      <section class="demo" aria-label="Live settlement">
+        <div class="status-panel">
+          <div class="power" title="Facilitator status">
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 3v9"
+                stroke="currentColor"
+                stroke-width="2.4"
+                stroke-linecap="round"
+              />
+              <path
+                d="M18.4 6.6a9 9 0 1 1-12.8 0"
+                stroke="currentColor"
+                stroke-width="2.4"
+                stroke-linecap="round"
+              />
+            </svg>
+          </div>
+        </div>
+
+        <div class="routing">
+          <div class="field">
+            <div class="label">Routing</div>
+            <div class="value">
+              <span class="dot-live"></span>
+              <span data-routing>Any x402 client</span>
+            </div>
+          </div>
+          <div class="field">
+            <div class="label">Asset</div>
+            <div class="value" data-asset>FXRP on Coston2</div>
+          </div>
+        </div>
+
+        <div class="quote">
+          <div class="line">
+            1 API call &middot; <strong data-usd>$0.0020</strong>
+            <span class="strike" data-fxrp>0.0041 FXRP</span>
+          </div>
+          <div class="headline" data-settled>Settled in 1.8s</div>
+        </div>
+
+        <div class="clients">
+          <div class="client">
+            Claude Code
+            <a class="connect" href="./docs#connect">Connect</a>
+          </div>
+          <div class="client">
+            Cursor
+            <a class="connect" href="./docs#connect">Connect</a>
+          </div>
+          <div class="client">
+            VS Code
+            <a class="connect" href="./docs#connect">Connect</a>
+          </div>
+          <a class="more" href="./docs#connect">More clients &rarr;</a>
+        </div>
+      </section>
+
+      <footer class="footer">
+        Scrip settles in FXRP on Flare, priced by
+        <a href="https://dev.flare.network/ftso/getting-started">FTSO</a>.
+        MIT licensed.
+      </footer>
+    </div>
+  </body>
+</html>

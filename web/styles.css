@@ -1,0 +1,323 @@
+/*
+ * Scrip design system.
+ *
+ * Adapted from the antseed.com reference: warm cream ground, near-black forest
+ * ink, emerald brand, fully-rounded geometry, soft low-contrast shadows.
+ *
+ * Deliberately light-only. The reference commits to a single look and the
+ * warm ground is load-bearing - a dark inversion would lose the thing that
+ * makes it distinctive. Every colour is set explicitly so nothing inherits a
+ * host background.
+ */
+
+:root {
+  /* Ground and surfaces */
+  --bg: #f6f4ec;
+  --surface: #ffffff;
+  --surface-sunken: #efece1;
+
+  /* Ink */
+  --ink: #072a1a;
+  --ink-muted: #4a6659;
+  --ink-faint: #86998f;
+
+  /* Brand */
+  --brand: #0fa968;
+  --brand-bright: #34e29b;
+  --brand-deep: #0b7a4b;
+
+  /* Lines and depth */
+  --border: rgba(7, 42, 26, 0.1);
+  --border-strong: rgba(7, 42, 26, 0.16);
+  --dot: rgba(7, 42, 26, 0.08);
+
+  --shadow-card: 0 1px 2px rgba(7, 42, 26, 0.04),
+    0 12px 32px rgba(7, 42, 26, 0.07);
+  --shadow-float: 0 2px 6px rgba(7, 42, 26, 0.06),
+    0 18px 44px rgba(7, 42, 26, 0.12);
+
+  /* Geometry */
+  --r-pill: 999px;
+  --r-card: 28px;
+  --r-inner: 18px;
+
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  --measure: 1120px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  /* The dot grid from the reference. Two layers so it fades toward the middle
+     rather than tiling flatly across the fold. */
+  background-image: radial-gradient(var(--dot) 1.5px, transparent 1.5px);
+  background-size: 22px 22px;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* ---------- Floating pill nav ---------- */
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border-radius: var(--r-pill);
+  padding: 14px 22px;
+  margin: 18px auto 0;
+  box-shadow: var(--shadow-card);
+}
+
+.nav-mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  font-size: 19px;
+}
+
+.nav-links {
+  margin-left: auto;
+  display: flex;
+  gap: 26px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.nav-links a {
+  color: var(--ink-muted);
+  text-decoration: none;
+}
+
+.nav-links a:hover {
+  color: var(--brand-deep);
+}
+
+/* ---------- Hero ---------- */
+
+.hero {
+  text-align: center;
+  padding: 76px 0 0;
+}
+
+.hero h1 {
+  font-size: clamp(2.6rem, 8.5vw, 5.2rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.98;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.hero .sub {
+  font-size: clamp(1.1rem, 3vw, 1.6rem);
+  color: var(--ink);
+  font-weight: 400;
+  margin: 20px 0 0;
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 20px 38px;
+  border-radius: var(--r-pill);
+  margin-top: 38px;
+  box-shadow: var(--shadow-card);
+}
+
+.cta:hover {
+  background: #0b3b26;
+}
+
+.hero .note {
+  color: var(--ink-muted);
+  margin: 20px 0 0;
+}
+
+/* ---------- The demo card ---------- */
+
+.demo {
+  background: var(--surface-sunken);
+  border-radius: var(--r-card);
+  padding: 14px;
+  margin: 56px auto 0;
+  max-width: 720px;
+  box-shadow: var(--shadow-card);
+  position: relative;
+}
+
+.status-panel {
+  background: linear-gradient(135deg, var(--brand-deep), var(--brand-bright));
+  border-radius: 22px;
+  height: 190px;
+  display: grid;
+  place-items: center;
+}
+
+.power {
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.28),
+    0 10px 30px rgba(7, 42, 26, 0.2);
+  color: var(--brand);
+}
+
+.routing {
+  display: flex;
+  gap: 16px;
+  background: var(--surface);
+  border: 2px solid var(--brand-bright);
+  border-radius: var(--r-inner);
+  padding: 16px 20px;
+  margin-top: -26px;
+  position: relative;
+  box-shadow: var(--shadow-card);
+}
+
+.routing .field {
+  flex: 1;
+}
+
+.routing .label {
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.routing .value {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dot-live {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--brand);
+  flex: none;
+}
+
+/* Floating quote card - the one element that overlaps its container in the
+   reference, which is what gives the composition depth. */
+.quote {
+  background: var(--surface);
+  border-radius: var(--r-inner);
+  padding: 18px 24px;
+  box-shadow: var(--shadow-float);
+  margin: 22px 0 0 auto;
+  max-width: 92%;
+  text-align: right;
+}
+
+.quote .line {
+  font-size: 1.05rem;
+}
+
+.quote .strike {
+  color: var(--ink-faint);
+  text-decoration: line-through;
+}
+
+.quote .headline {
+  color: var(--brand);
+  font-weight: 800;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+}
+
+/* ---------- Client rows ---------- */
+
+.clients {
+  padding: 22px 10px 6px;
+}
+
+.client {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 12px;
+  font-weight: 500;
+}
+
+.client + .client {
+  border-top: 1px solid var(--border);
+}
+
+.client .connect {
+  margin-left: auto;
+  color: var(--brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.more {
+  display: block;
+  text-align: center;
+  color: var(--brand);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  padding: 16px 0 8px;
+}
+
+/* ---------- Footer ---------- */
+
+.footer {
+  text-align: center;
+  color: var(--ink-muted);
+  font-size: 0.95rem;
+  padding: 70px 0 50px;
+}
+
+.footer a {
+  color: var(--brand-deep);
+}
+
+@media (max-width: 620px) {
+  .nav-links {
+    display: none;
+  }
+  .routing {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .quote {
+    max-width: 100%;
+  }
+}
