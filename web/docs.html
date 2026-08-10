@@ -69,6 +69,7 @@
           what is running - nothing here is aspirational, and the pieces that
           are not finished say so.
         </p>
+        <div class="table-wrap">
         <table>
           <thead>
             <tr><th>Piece</th><th>State</th></tr>
@@ -104,6 +105,7 @@
             </tr>
           </tbody>
         </table>
+        </div>
 
         <h2 id="how">How a payment works</h2>
         <p>
@@ -157,22 +159,28 @@ agent  &lt;--200--      endpoint     resource delivered</code></pre>
         </ul>
 
         <h2 id="addresses">Addresses (Coston2)</h2>
-        <table>
-          <tbody>
-            <tr>
-              <td>FXRP</td>
-              <td><code>0x0b6A3645c240605887a5532109323A3E12273dc7</code></td>
-            </tr>
-            <tr>
-              <td>AssetManagerFXRP</td>
-              <td><code>0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA</code></td>
-            </tr>
-            <tr>
-              <td>ScripFacilitator</td>
-              <td>not yet deployed</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="addr">
+          <div class="addr-row">
+            <span class="addr-label">FXRP</span>
+            <a
+              class="addr-value"
+              href="https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7"
+              >0x0b6A3645c240605887a5532109323A3E12273dc7</a
+            >
+          </div>
+          <div class="addr-row">
+            <span class="addr-label">AssetManagerFXRP</span>
+            <a
+              class="addr-value"
+              href="https://coston2-explorer.flare.network/address/0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA"
+              >0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA</a
+            >
+          </div>
+          <div class="addr-row">
+            <span class="addr-label">ScripFacilitator</span>
+            <span class="addr-value muted">Not yet deployed</span>
+          </div>
+        </div>
         <p>
           FXRP is resolved at runtime through the Flare Contract Registry rather
           than hardcoded, so a redeployment does not break the code. The testnet
