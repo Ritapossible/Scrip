@@ -12,20 +12,48 @@
   </head>
   <body>
     <div class="shell">
-      <nav class="nav">
-        <div class="nav-mark">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="12" cy="5" r="3" fill="#0FA968" />
-            <circle cx="12" cy="12" r="3.6" fill="#0B7A4B" />
-            <circle cx="12" cy="19" r="3" fill="#34E29B" />
-          </svg>
-          SCRIP
-        </div>
-        <div class="nav-links">
+      <div class="nav-wrap">
+        <nav class="nav">
+          <button
+            class="nav-toggle"
+            type="button"
+            data-menu-toggle
+            aria-expanded="false"
+            aria-controls="site-menu"
+            aria-label="Open menu"
+          >
+            <span></span><span></span><span></span>
+          </button>
+
+          <a class="nav-mark" href="./">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="5" r="3" fill="#0FA968" />
+              <circle cx="12" cy="12" r="3.6" fill="#0B7A4B" />
+              <circle cx="12" cy="19" r="3" fill="#34E29B" />
+            </svg>
+            SCRIP
+          </a>
+
+          <div class="nav-links">
+            <a href="./docs">Docs</a>
+            <a href="./docs#status">Status</a>
+            <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
+            <a class="nav-cta" href="./docs#run">Get Started</a>
+          </div>
+        </nav>
+
+        <div class="menu" id="site-menu" data-menu aria-hidden="true">
+          <a href="./docs#how">How it works <span class="hint">the payment flow</span></a>
+          <a href="./docs#flare">Why Flare <span class="hint">FAssets + FTSO</span></a>
+          <a href="./docs#addresses">Addresses <span class="hint">Coston2</span></a>
+          <a href="./docs#status">Status <span class="hint">what runs today</span></a>
+          <div class="menu-sep"></div>
           <a href="./docs">Docs</a>
-          <a href="https://github.com/Ritapossible/scrip">GitHub</a>
+          <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
+          <a class="menu-cta" href="./docs#run">Get Started</a>
         </div>
-      </nav>
+      </div>
+      <div class="menu-scrim" data-menu-scrim></div>
 
       <header class="hero">
         <h1>Machine-Payable FXRP</h1>
@@ -114,5 +142,6 @@
         MIT licensed.
       </footer>
     </div>
+    <script src="./app.js"></script>
   </body>
 </html>

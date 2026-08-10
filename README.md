@@ -117,7 +117,13 @@ git clone https://github.com/Ritapossible/Scrip.git
 cd Scrip
 npm install
 npm run probe     # read-only, no keys, no gas
+npm run web       # http://127.0.0.1:8080
 ```
+
+Use `npm run web` rather than a plain static server: the pages link to `./docs`
+without an extension, which production resolves through Vercel's `cleanUrls`. A
+plain server returns 404 for it, so the Docs link and every menu entry look
+broken when the site is fine.
 
 To go further, copy `.env.example` to `.env` and fill in three throwaway
 wallets:
@@ -147,9 +153,11 @@ src/
   chain.ts               Coston2 definition + the contract registry address
 scripts/
   probe.ts               read-only: resolve FXRP, verify the signing domain
+  serve-web.mjs          local server matching production URL rules
 web/
   index.html             landing page
   docs.html              reference
+  app.js                 site menu
   styles.css             design system
 vercel.json              static hosting, no build step
 ```

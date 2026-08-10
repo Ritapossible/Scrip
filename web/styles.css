@@ -75,15 +75,63 @@ body {
 
 /* ---------- Floating pill nav ---------- */
 
+.nav-wrap {
+  position: relative;
+  z-index: 40;
+  padding-top: 18px;
+}
+
 .nav {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   background: var(--surface);
   border-radius: var(--r-pill);
-  padding: 14px 22px;
-  margin: 18px auto 0;
+  padding: 12px 18px;
   box-shadow: var(--shadow-card);
+}
+
+/* Hamburger. Three bars that cross into an X when open, as in the reference. */
+.nav-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 8px;
+  margin: -8px;
+  cursor: pointer;
+  color: var(--ink);
+  display: grid;
+  gap: 6px;
+  border-radius: 12px;
+}
+
+.nav-toggle span {
+  display: block;
+  width: 27px;
+  height: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: transform 0.22s ease, opacity 0.16s ease;
+}
+
+.nav-toggle[aria-expanded="true"] span:nth-child(1) {
+  transform: translateY(9px) rotate(45deg);
+}
+
+.nav-toggle[aria-expanded="true"] span:nth-child(2) {
+  opacity: 0;
+}
+
+.nav-toggle[aria-expanded="true"] span:nth-child(3) {
+  transform: translateY(-9px) rotate(-45deg);
+}
+
+.nav-toggle:focus-visible,
+.nav-mark:focus-visible,
+.menu a:focus-visible,
+.nav-links a:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 3px;
 }
 
 .nav-mark {
@@ -93,14 +141,17 @@ body {
   font-weight: 800;
   letter-spacing: 0.04em;
   font-size: 19px;
+  color: var(--ink);
+  text-decoration: none;
 }
 
 .nav-links {
   margin-left: auto;
-  display: flex;
+  display: none;
   gap: 26px;
   font-size: 15px;
   font-weight: 500;
+  align-items: center;
 }
 
 .nav-links a {
@@ -110,6 +161,115 @@ body {
 
 .nav-links a:hover {
   color: var(--brand-deep);
+}
+
+.nav-cta {
+  background: var(--ink);
+  color: var(--surface) !important;
+  padding: 10px 20px;
+  border-radius: var(--r-pill);
+  font-weight: 600;
+}
+
+.nav-cta:hover {
+  background: #0b3b26;
+}
+
+@media (min-width: 800px) {
+  .nav-links {
+    display: flex;
+  }
+}
+
+/* ---------- Menu panel ---------- */
+
+.menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-float);
+  padding: 12px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+}
+
+.menu.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.menu a {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: var(--r-inner);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 1.12rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.menu a:hover {
+  background: var(--surface-sunken);
+}
+
+.menu a .hint {
+  margin-left: auto;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink-faint);
+}
+
+.menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 14px;
+}
+
+.menu .menu-cta {
+  background: var(--ink);
+  color: var(--surface);
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.menu .menu-cta:hover {
+  background: #0b3b26;
+}
+
+.menu-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 42, 26, 0.28);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s ease, visibility 0.18s;
+  z-index: 30;
+}
+
+.menu-scrim.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+body.menu-open {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu,
+  .menu-scrim,
+  .nav-toggle span {
+    transition: none;
+  }
 }
 
 /* ---------- Hero ---------- */
