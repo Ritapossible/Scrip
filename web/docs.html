@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scrip - docs</title>
+    <meta
+      name="description"
+      content="How Scrip settles x402 invoices in FXRP on Flare: the EIP-2612 permit flow, FTSO pricing, and what is working today."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <nav class="nav">
+        <div class="nav-mark">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="5" r="3" fill="#0FA968" />
+            <circle cx="12" cy="12" r="3.6" fill="#0B7A4B" />
+            <circle cx="12" cy="19" r="3" fill="#34E29B" />
+          </svg>
+          SCRIP
+        </div>
+        <div class="nav-links">
+          <a href="./">Home</a>
+          <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
+        </div>
+      </nav>
+
+      <main class="doc">
+        <h1>Scrip</h1>
+        <p class="lede">
+          A payment rail that makes bridged XRP spendable by software. Agents
+          pay per call in FXRP, priced in USD by Flare's FTSO, holding no gas
+          token.
+        </p>
+
+        <h2>Status</h2>
+        <p>
+          Built during Flare Summer Signal, on Coston2. This page states only
+          what is running - nothing here is aspirational.
+        </p>
+        <table>
+          <thead>
+            <tr><th>Piece</th><th>State</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Chain probe (resolves FXRP, verifies EIP-712 domain)</td>
+              <td><span class="pill">working</span></td>
+            </tr>
+            <tr>
+              <td><code>ScripFacilitator.sol</code></td>
+              <td><span class="pill pending">written, not deployed</span></td>
+            </tr>
+            <tr>
+              <td>Gasless settlement (<code>settle.ts</code>)</td>
+              <td><span class="pill pending">next</span></td>
+            </tr>
+            <tr>
+              <td>FTSO USD pricing</td>
+              <td><span class="pill pending">next</span></td>
+            </tr>
+            <tr>
+              <td>x402 facilitator + middleware</td>
+              <td><span class="pill pending">next</span></td>
+            </tr>
+            <tr>
+              <td>Live figures on the home page</td>
+              <td><span class="pill pending">placeholders</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>How a payment works</h2>
+        <p>
+          An agent requests a paid endpoint. The server answers <code>402</code>
+          with a price in USD. The agent signs one offchain EIP-2612 permit. The
+          facilitator submits it, moves FXRP, and the endpoint returns its
+          result. The agent never sends a transaction and never needs C2FLR.
+        </p>
+        <pre><code>agent --GET--&gt; endpoint          402 + price in USD
+agent --sign--&gt; permit (offchain, no gas)
+relayer --settle()--&gt; Flare     permit + transferFrom
+agent &lt;--200-- endpoint          resource delivered</code></pre>
+
+        <h2>Why this needs Flare specifically</h2>
+        <ul>
+          <li>
+            <strong>FAssets / FXRP</strong> is the settlement asset. FAssets
+            gives XRP a way onto Flare; this gives it a reason to move.
+          </li>
+          <li>
+            <strong>FTSO</strong> prices every invoice. Invoices are denominated
+            in USD and settled in FXRP at Flare's enshrined onchain feed, so the
+            oracle is load-bearing rather than decorative.
+          </li>
+          <li>
+            <strong>EIP-2612, not EIP-3009.</strong> FXRP implements
+            <code>permit</code>, not <code>transferWithAuthorization</code>.
+            Every x402 implementation written for USDC assumes the latter, so
+            the signing path here had to be built against Flare's actual token.
+          </li>
+        </ul>
+
+        <h2>Deployed addresses (Coston2)</h2>
+        <table>
+          <tbody>
+            <tr>
+              <td>FXRP</td>
+              <td><code>0x0b6A3645c240605887a5532109323A3E12273dc7</code></td>
+            </tr>
+            <tr>
+              <td>AssetManagerFXRP</td>
+              <td><code>0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA</code></td>
+            </tr>
+            <tr>
+              <td>ScripFacilitator</td>
+              <td>not yet deployed</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          FXRP is resolved at runtime through the Flare Contract Registry rather
+          than hardcoded, so a redeployment does not break the code.
+        </p>
+
+        <h2>Run the probe</h2>
+        <p>
+          Read-only. Needs no keys and spends no gas. It reports every fact the
+          facilitator depends on, and fails loudly if signatures would not
+          verify.
+        </p>
+        <pre><code>git clone https://github.com/Ritapossible/Scrip.git
+cd Scrip
+npm install
+npm run probe</code></pre>
+
+        <h2 id="connect">Connecting a client</h2>
+        <p>
+          The MCP server that lets Claude Code, Cursor, or VS Code spend through
+          Scrip is not built yet. When it is, it will be documented here.
+        </p>
+
+        <h2>Known limitation</h2>
+        <p>
+          EIP-2612 nonces are sequential per payer, so an agent paying two
+          endpoints concurrently will have the second permit fail on a consumed
+          nonce. EIP-3009's random nonces avoid this, but FXRP does not
+          implement EIP-3009. Payments are serialised per payer until that is
+          addressed.
+        </p>
+      </main>
+
+      <footer class="footer">
+        Scrip settles in FXRP on Flare, priced by
+        <a href="https://dev.flare.network/ftso/getting-started">FTSO</a>.
+        MIT licensed.
+      </footer>
+    </div>
+  </body>
+</html>
