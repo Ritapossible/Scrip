@@ -50,28 +50,40 @@ find-and-replace.
 
 ```
 agent  --GET-->     endpoint      402 + price in USD
-agent  --sign-->    permit        offchain, no gas, no transaction
+agent  --sign-->    permit+intent offchain, no gas, no transaction
 relay  --settle()-> Flare         permit + transferFrom, relayer pays gas
 agent  <--200--     endpoint      resource delivered
 ```
 
-The payer signs an EIP-2612 permit. `ScripFacilitator.settle()` submits it,
+The payer signs twice, offchain. `ScripFacilitator.settle()` submits both,
 moves FXRP to the payee, and binds the payment to an invoice ID so the same
-signature cannot be replayed before its deadline.
+signatures cannot be replayed before their deadline.
 
-Two details in the contract are worth knowing about:
+Three details in the contract are worth knowing about:
+
+**It takes two signatures, not one.** An EIP-3009 authorisation names its
+recipient; an EIP-2612 permit does not - it commits only to
+`(owner, spender, value, nonce, deadline)` and says nothing about where the
+money then goes. Since `settle()` is permissionless so that any relayer can
+carry a payment, a permit alone would let anyone who observed the signature call
+`settle()` naming themselves as payee. So the payer also signs a `PaymentIntent`
+over this contract's own EIP-712 domain, naming the invoice, the payee and the
+amount. The permit authorises the allowance; the intent authorises the
+destination. Neither is sufficient alone.
 
 **It measures what actually arrived.** FAssets parameters are asset-manager
 controlled and may levy a transfer fee, so `settle()` reads the payee balance
 before and after and reverts with `Underdelivered` if the payee received less
 than the invoice. A payment rail that silently underpays is a broken one.
 
-**The permit call is not yet wrapped in `try/catch`.** That is deliberate while
-the flow is being proven - a bad signature should revert with a readable reason
-rather than fail later as an opaque allowance error. It gets wrapped once
-signing is confirmed end to end, because in production a front-runner can
-consume the permit from the mempool and the `transferFrom` is what actually has
-to succeed.
+**The permit call is wrapped in `try/catch`.** A front-runner can lift the permit
+out of the mempool and submit it directly, which consumes the nonce and makes a
+bare `permit` call here revert - griefing every payment on the rail for the price
+of gas. Swallowing that revert is only safe because the intent has already fixed
+the destination, so a griefer who replays the permit just moves the allowance
+into place and gains nothing. The allowance is then checked explicitly, so a
+genuinely missing one still reports itself rather than failing opaquely inside
+the token.
 
 ---
 

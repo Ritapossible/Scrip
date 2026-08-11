@@ -1,0 +1,17 @@
+[profile.default]
+src = "contracts"
+test = "test"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+optimizer = true
+optimizer_runs = 200
+
+# london, not the 0.8.24 default of cancun. Cancun emits TSTORE/MCOPY and
+# shanghai emits PUSH0; Flare's EVM is Avalanche-derived and its support for
+# those is not something to discover from a failed deployment. London is
+# accepted everywhere and the gas difference does not matter at this size.
+evm_version = "london"
+
+[rpc_endpoints]
+coston2 = "https://coston2-api.flare.network/ext/C/rpc"
