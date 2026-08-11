@@ -31,6 +31,8 @@ import {
   getAddress,
   decodeEventLog,
   hashTypedData,
+  BaseError,
+  ContractFunctionRevertedError,
   type Address,
   type Hex,
 } from "viem";
@@ -207,8 +209,11 @@ async function main(): Promise<void> {
     verifyingContract: domain[4],
   } as const;
 
+  // One deadline governs both signatures. An hour is generous for a testnet
+  // whose public RPC is slow on a cold call; DEADLINE_SECONDS exists so the
+  // expiry path can be forced with a negative value rather than waited out.
   const block = await client.getBlock();
-  const deadline = block.timestamp + 3600n;
+  const deadline = block.timestamp + BigInt(process.env.DEADLINE_SECONDS ?? 3600);
   const invoiceId = keccak256(
     toBytes(process.env.INVOICE_ID ?? `scrip-${Date.now()}-${Math.random()}`),
   );
@@ -257,7 +262,7 @@ async function main(): Promise<void> {
   console.log("\nsigning");
   line("token domain", `${tokenDomain.name} v${tokenDomain.version}`);
   line("invoice id", invoiceId);
-  line("deadline", `${deadline} (1h)`);
+  line("deadline", `${deadline} (+${process.env.DEADLINE_SECONDS ?? 3600}s)`);
   line("onchain digest", onchainDigest);
   line("local digest", localDigest);
 
@@ -352,7 +357,47 @@ async function main(): Promise<void> {
   );
 }
 
+/**
+ * Every custom error the facilitator can raise, said in a sentence. The nine
+ * signatures are in facilitatorAbi so viem can decode a revert; without this
+ * they still arrive as a name and a tuple, which is only marginally better than
+ * a bare selector when the demo is on a clock.
+ */
+function explainRevert(name: string, args: readonly unknown[]): string {
+  switch (name) {
+    case "Expired":
+      return `the deadline passed before the transaction was mined (deadline ${args[0]}, block time ${args[1]}). The public Coston2 RPC can be slow - just run it again.`;
+    case "AlreadySettled":
+      return `invoice ${args[0]} was already settled. Invoice IDs are single-use.`;
+    case "IntentNotSignedByPayer":
+      return `the intent signature recovered to ${args[0]}, not the payer ${args[1]}. The signer and the contract disagree about the EIP-712 domain or the intent fields.`;
+    case "InsufficientAllowance":
+      return `the permit did not grant enough allowance (have ${args[0]}, need ${args[1]}). The permit signature was probably rejected by the token - check the payer's nonce.`;
+    case "Underdelivered":
+      return `the payee received ${args[1]} but the invoice was for ${args[0]}. FXRP is levying a transfer fee, so the invoice cannot be settled at face value.`;
+    case "TransferFailed":
+      return "FXRP's transferFrom failed or returned false.";
+    case "ZeroPayee":
+      return "PAYEE_ADDRESS is the zero address.";
+    case "MalleableSignature":
+      return "a signature had a high-half-order s value. The signer is not normalising to EIP-2.";
+    case "BadSignatureV":
+      return `signature v was ${args[0]}, expected 27 or 28.`;
+    default:
+      return `${name}(${args.join(", ")})`;
+  }
+}
+
 main().catch((err: unknown) => {
+  if (err instanceof BaseError) {
+    const revert = err.walk((e) => e instanceof ContractFunctionRevertedError);
+    if (revert instanceof ContractFunctionRevertedError && revert.data) {
+      const { errorName, args = [] } = revert.data;
+      console.error(`\nsettle reverted: ${errorName}`);
+      console.error(`  ${explainRevert(errorName, args)}\n`);
+      process.exit(1);
+    }
+  }
   console.error(
     `\nsettle failed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
   );
