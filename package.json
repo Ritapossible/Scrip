@@ -10,7 +10,8 @@
   "scripts": {
     "probe": "tsx scripts/probe.ts",
     "settle": "tsx scripts/settle.ts",
-    "web": "node scripts/serve-web.mjs"
+    "web": "node scripts/serve-web.mjs",
+    "test:fork": "node scripts/settle-fork-test.mjs"
   },
   "keywords": [
     "flare",

@@ -19,8 +19,9 @@ live Coston2.
 | Piece | State |
 |---|---|
 | Chain probe - resolves FXRP, verifies the EIP-712 domain | working, live Coston2 |
-| `ScripFacilitator.sol` | written, not yet deployed |
-| Gasless settlement (`settle.ts`) | next |
+| `ScripFacilitator.sol` | written, compiles, **not yet deployed** |
+| `settle()` end to end - real FXRP, real signatures | working, on a fork of live Coston2 |
+| Gasless settlement against deployed Coston2 (`settle.ts`) | next |
 | FTSO USD pricing | next |
 | x402 facilitator service + Express middleware | next |
 | MCP server so an assistant can spend | next |
@@ -107,6 +108,37 @@ Three results from the live run:
 
 ---
 
+## What the fork test proves
+
+`npm run test:fork` forks live Coston2, deploys the facilitator onto the fork,
+and settles a real invoice against the **real FXRP contract** with real
+signatures. No mocks - the token is the deployed vendored FAsset, resolved at
+its live address.
+
+```bash
+anvil --fork-url https://coston2-api.flare.network/ext/C/rpc --port 8546
+forge build
+npm run test:fork
+```
+
+Five properties, each asserted rather than asserted-about:
+
+1. **The payment is gasless.** The payer's native balance is set to zero before
+   signing and checked to still be zero afterwards. A payer holding no C2FLR
+   pays a 1.5 FXRP invoice; the relayer's address is the one on the receipt.
+2. **The signatures verify against FXRP's vendored `permit`.** Not against a
+   mock, and not against stock OpenZeppelin.
+3. **A relayer cannot redirect the payment.** A third account calls `settle()`
+   substituting itself as payee and is rejected with `IntentNotSignedByPayer`.
+   This is the hole the PaymentIntent exists to close, so it is tested as an
+   attack rather than assumed.
+4. **An invoice settles once.** Replaying the same signatures reverts with
+   `AlreadySettled`.
+5. **A front-runner cannot grief a payment.** A third account lifts the permit
+   and submits it straight to FXRP, consuming the nonce. `settle()` still
+   delivers the full amount - which is the entire justification for the
+   `try/catch`.
+
 ## Addresses (Coston2)
 
 | Contract | Address |
@@ -165,6 +197,7 @@ src/
   chain.ts               Coston2 definition + the contract registry address
 scripts/
   probe.ts               read-only: resolve FXRP, verify the signing domain
+  settle-fork-test.mjs   settles a real invoice against a fork of live Coston2
   serve-web.mjs          local server matching production URL rules
 web/
   index.html             landing page
