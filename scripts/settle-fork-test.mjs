@@ -29,6 +29,9 @@ const ASSET_MANAGER_FXRP = '0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA';
 // loudly if a redeployed FXRP ever moves it.
 const FXRP_BALANCE_SLOT = 0n;
 
+// anvil's default accounts. These keys are published in anvil's own startup
+// output and are the same for every install - they are not secrets, and they
+// control nothing outside a local fork.
 const payer   = privateKeyToAccount('0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d');
 const relayer = privateKeyToAccount('0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a');
 // anvil #4. Must NOT be the payee - if the thief and payee are the same address
