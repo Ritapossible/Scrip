@@ -19,7 +19,7 @@ live Coston2.
 | Piece | State |
 |---|---|
 | Chain probe - resolves FXRP, verifies the EIP-712 domain | working, live Coston2 |
-| `ScripFacilitator.sol` | written, compiles, **not yet deployed** |
+| `ScripFacilitator.sol` | deployed and source-verified on Coston2 |
 | `settle()` end to end - real FXRP, real signatures | working, on a fork of live Coston2 |
 | Gasless settlement against deployed Coston2 (`settle.ts`) | next |
 | FTSO USD pricing | next |
@@ -148,7 +148,13 @@ Five properties, each asserted rather than asserted-about:
 |---|---|
 | FXRP | `0x0b6A3645c240605887a5532109323A3E12273dc7` |
 | AssetManagerFXRP | `0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA` |
-| ScripFacilitator | not yet deployed |
+| ScripFacilitator | `0x43F672C0a915F59A2472a07D2108936e217cB04C` |
+
+[ScripFacilitator on the explorer][fac], source-verified. Deployed in block
+33930955, tx
+`0x2bf4a067e1cbfc75a560639a1157f5ae059d35158568df342f47a7777f152aa9`.
+
+[fac]: https://coston2-explorer.flare.network/address/0x43F672C0a915F59A2472a07D2108936e217cB04C
 
 The testnet token reports its symbol as `FTestXRP` and its name as `FXRP`. Use
 the value the contract returns rather than assuming either.
@@ -229,9 +235,9 @@ reissue. Namespacing invoice IDs per payer would close it.
 
 ## Roadmap
 
-Deploy the facilitator, land a gasless settlement on Coston2, add FTSO pricing,
-then ship the x402 facilitator service and the Express middleware so any Flare
-service can charge for a request in about five lines.
+Land a gasless settlement against the deployed facilitator on live Coston2, add
+FTSO pricing, then ship the x402 facilitator service and the Express middleware
+so any Flare service can charge for a request in about five lines.
 
 ---
 
