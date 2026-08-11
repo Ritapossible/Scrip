@@ -9,6 +9,7 @@
   },
   "scripts": {
     "probe": "tsx scripts/probe.ts",
+    "settle": "tsx scripts/settle.ts",
     "web": "node scripts/serve-web.mjs",
     "test:fork": "node scripts/settle-fork-test.mjs"
   },
@@ -27,6 +28,7 @@
     "viem": "^2.21.0"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

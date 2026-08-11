@@ -21,7 +21,7 @@ live Coston2.
 | Chain probe - resolves FXRP, verifies the EIP-712 domain | working, live Coston2 |
 | `ScripFacilitator.sol` | deployed and source-verified on Coston2 |
 | `settle()` end to end - real FXRP, real signatures | working, on a fork of live Coston2 |
-| Gasless settlement against deployed Coston2 (`settle.ts`) | next |
+| Gasless settlement (`settle.ts`) | written; runs against the deployed facilitator on a fork. Not yet run on live Coston2 - needs a payer funded with FXRP |
 | FTSO USD pricing | next |
 | x402 facilitator service + Express middleware | next |
 | MCP server so an assistant can spend | next |
@@ -187,7 +187,21 @@ wallets:
 - **PAYEE** just receives.
 
 Fund them from the [Coston2 faucet](https://faucet.flare.network/coston2), which
-dispenses both C2FLR and FXRP.
+dispenses both C2FLR and FXRP. Send the payer's C2FLR away after funding - a
+zero native balance is what the demo proves, and `settle.ts` says so if the
+payer still holds any.
+
+Then settle an invoice against the deployed facilitator:
+
+```bash
+npm run settle           # pays 0.5 FXRP
+npm run settle -- 1.25   # pays 1.25 FXRP
+```
+
+It resolves FXRP through the registry, checks its locally built EIP-712 digest
+against the facilitator's own `intentDigest()` before signing anything, and
+refuses to run if the payer is short, the relayer has no gas, or the invoice was
+already settled.
 
 Two environment notes that cost time otherwise: the public Coston2 RPC times out
 on a cold call well past viem's 10 second default, so the transport here is set
@@ -206,6 +220,7 @@ src/
   chain.ts               Coston2 definition + the contract registry address
 scripts/
   probe.ts               read-only: resolve FXRP, verify the signing domain
+  settle.ts              signs and settles one invoice, gaslessly
   settle-fork-test.mjs   settles a real invoice against a fork of live Coston2
   serve-web.mjs          local server matching production URL rules
 web/
