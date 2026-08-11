@@ -18,8 +18,11 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 
 const RPC = 'http://127.0.0.1:8546';
-const FXRP = '0x0b6A3645c240605887a5532109323A3E12273dc7';
 const CHAIN_ID = 114;
+
+// Resolved, not hardcoded - same path probe.ts takes, so a redeployed FXRP
+// does not silently make this test pass against a dead address.
+const ASSET_MANAGER_FXRP = '0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA';
 
 // FXRP keeps balances in a plain mapping at slot 0, behind an EIP-1967 proxy.
 // Found by probing, not assumed - see the sentinel check below, which fails
@@ -46,6 +49,13 @@ await pub.getBlockNumber().catch(() => {
     '  anvil --fork-url https://coston2-api.flare.network/ext/C/rpc --port 8546');
   process.exit(1);
 });
+
+const FXRP = await pub.readContract({
+  address: ASSET_MANAGER_FXRP,
+  abi: parseAbi(['function fAsset() view returns (address)']),
+  functionName: 'fAsset',
+});
+console.log(`FXRP resolved from AssetManagerFXRP: ${FXRP}\n`);
 
 const rpc = (method, params) => fetch(RPC, {
   method: 'POST', headers: { 'content-type': 'application/json' },
@@ -110,7 +120,9 @@ const decimals = await pub.readContract({ address: FXRP, abi: tokenAbi, function
 const AMOUNT = 1_500_000n;               // 1.5 FXRP at 6 decimals
 const FUND   = 10_000_000n;              // 10 FXRP
 
-// Give the payer FXRP by writing the balances mapping (slot 0) directly.
+// Give the payer FXRP by writing the balances mapping directly. Minting FAssets
+// legitimately needs an XRP payment proof, which is not something a test can
+// produce - so the funding is synthetic even though the token is not.
 const balSlot = keccak256(encodeAbiParameters([{ type: 'address' }, { type: 'uint256' }], [payer.address, FXRP_BALANCE_SLOT]));
 await rpc('anvil_setStorageAt', [FXRP, balSlot, pad(toHex(FUND), { size: 32 })]);
 

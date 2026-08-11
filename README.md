@@ -112,8 +112,11 @@ Three results from the live run:
 
 `npm run test:fork` forks live Coston2, deploys the facilitator onto the fork,
 and settles a real invoice against the **real FXRP contract** with real
-signatures. No mocks - the token is the deployed vendored FAsset, resolved at
-its live address.
+signatures. The token is not a mock: it is the deployed vendored FAsset,
+resolved through `AssetManagerFXRP.fAsset()` the same way `probe.ts` resolves
+it. The payer's FXRP balance *is* synthetic - written straight into the token's
+balance mapping on the fork, because minting FAssets legitimately requires an
+XRP payment proof that a test cannot produce.
 
 ```bash
 anvil --fork-url https://coston2-api.flare.network/ext/C/rpc --port 8546
@@ -215,6 +218,12 @@ EIP-2612 nonces are sequential per payer, so an agent paying two endpoints
 concurrently will have the second permit fail on a consumed nonce. EIP-3009's
 random nonces avoid this, but FXRP does not implement EIP-3009. Payments are
 serialised per payer until that is addressed.
+
+`settled` is keyed on `invoiceId` alone, not on `(invoiceId, payer)`. Invoice
+IDs travel the x402 HTTP path, so anyone who sees one can settle their own
+payment against it first and burn it for the intended payer. No funds are at
+risk - the intent still binds payer, payee and amount - but the service has to
+reissue. Namespacing invoice IDs per payer would close it.
 
 ---
 
