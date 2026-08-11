@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Scrip">
+  <!-- The nav mark, scaled for a 16px tab. The circles are the logo's; the
+       cream tile is what keeps them legible against a dark browser chrome,
+       which a transparent background does not. -->
+  <rect width="32" height="32" rx="8" fill="#F6F4EC" />
+  <circle cx="16" cy="8" r="4" fill="#0FA968" />
+  <circle cx="16" cy="16" r="4.8" fill="#0B7A4B" />
+  <circle cx="16" cy="24" r="4" fill="#34E29B" />
+</svg>

@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Status - Scrip</title>
+    <meta
+      name="description"
+      content="What is actually running in Scrip, what has been verified and how, and what is not built yet. Nothing on this page is aspirational."
+    />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <div class="nav-wrap">
+        <nav class="nav">
+          <button
+            class="nav-toggle"
+            type="button"
+            data-menu-toggle
+            aria-expanded="false"
+            aria-controls="site-menu"
+            aria-label="Open menu"
+          >
+            <span></span><span></span><span></span>
+          </button>
+
+          <a class="nav-mark" href="./">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="5" r="3" fill="#0FA968" />
+              <circle cx="12" cy="12" r="3.6" fill="#0B7A4B" />
+              <circle cx="12" cy="19" r="3" fill="#34E29B" />
+            </svg>
+            SCRIP
+          </a>
+
+          <div class="nav-links">
+            <a href="./how-it-works">How it works</a>
+            <a href="./contract">Contract</a>
+            <a href="./status" aria-current="page">Status</a>
+            <a href="./docs">Docs</a>
+            <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
+            <a class="nav-cta" href="./docs#quickstart">Get Started</a>
+          </div>
+        </nav>
+
+        <div class="menu" id="site-menu" data-menu aria-hidden="true">
+          <a href="./how-it-works">How it works <span class="hint">two signatures</span></a>
+          <a href="./contract">Contract <span class="hint">deployed + verified</span></a>
+          <a href="./status" aria-current="page">Status <span class="hint">what runs today</span></a>
+          <a href="./docs">Docs <span class="hint">run it yourself</span></a>
+          <div class="menu-sep"></div>
+          <a href="./">Home</a>
+          <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
+          <a class="menu-cta" href="./docs#quickstart">Get Started</a>
+        </div>
+      </div>
+      <div class="menu-scrim" data-menu-scrim></div>
+
+      <header class="page-head">
+        <p class="eyebrow">Status</p>
+        <h1>What actually runs</h1>
+        <p class="lede">
+          Built during Flare Summer Signal, on Coston2. Everything marked working
+          has been run and its output checked. The pieces that are not finished
+          say so.
+        </p>
+      </header>
+
+      <main class="doc">
+        <h2 id="table">The state of each piece</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Piece</th><th>State</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Chain probe - resolves FXRP, verifies the EIP-712 domain</td>
+                <td><span class="pill">live Coston2</span></td>
+              </tr>
+              <tr>
+                <td><code>ScripFacilitator.sol</code> deployed + source-verified</td>
+                <td><span class="pill">live Coston2</span></td>
+              </tr>
+              <tr>
+                <td><code>settle()</code> end to end, real FXRP, real signatures</td>
+                <td><span class="pill">verified on a fork</span></td>
+              </tr>
+              <tr>
+                <td>Attack coverage - payee substitution, replay, permit grief</td>
+                <td><span class="pill">verified on a fork</span></td>
+              </tr>
+              <tr>
+                <td><code>settle.ts</code> against live Coston2</td>
+                <td><span class="pill pending">needs a funded payer</span></td>
+              </tr>
+              <tr>
+                <td>FTSO USD pricing</td>
+                <td><span class="pill pending">next</span></td>
+              </tr>
+              <tr>
+                <td>x402 facilitator service + Express middleware</td>
+                <td><span class="pill pending">next</span></td>
+              </tr>
+              <tr>
+                <td>MCP server so an assistant can spend</td>
+                <td><span class="pill pending">not built</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="verified">What has been verified, and how</h2>
+        <p>
+          <code>npm run test:fork</code> forks live Coston2, deploys the
+          facilitator onto the fork, and settles a real invoice against the
+          <strong>real FXRP contract</strong> - the deployed vendored FAsset,
+          resolved through <code>AssetManagerFXRP.fAsset()</code>, not a mock.
+          Each property below is asserted, and the attacks are run as attacks.
+        </p>
+
+        <ul class="checks">
+          <li>
+            <strong>The payment is gasless.</strong> The payer's native balance
+            is forced to zero before signing and checked to still be zero after.
+            The receipt shows the relayer's address paid.
+          </li>
+          <li>
+            <strong>Signatures verify against FXRP's vendored
+            <code>permit</code></strong> - not stock OpenZeppelin, and not a
+            mock.
+          </li>
+          <li>
+            <strong>A relayer cannot redirect the payment.</strong> A third
+            account calls <code>settle()</code> substituting itself as payee and
+            is rejected with <code>IntentNotSignedByPayer</code>.
+          </li>
+          <li>
+            <strong>An invoice settles once.</strong> Replaying the same
+            signatures reverts with <code>AlreadySettled</code>.
+          </li>
+          <li>
+            <strong>A front-runner cannot grief a payment.</strong> A third
+            account submits the permit straight to FXRP, burning the nonce.
+            <code>settle()</code> still delivers in full.
+          </li>
+        </ul>
+
+        <pre><code>attack: relayer substitutes itself as payee
+  PASS  payee substitution rejected with IntentNotSignedByPayer
+
+settle
+  PASS  delivered == requested (1500000 == 1500000)
+  PASS  payer native balance still 0 - the payment was gasless
+  PASS  relayer paid the gas
+
+replay: same invoice again
+  PASS  replay rejected with AlreadySettled
+
+front-runner replays the permit directly to FXRP
+  PASS  front-runner consumed the nonce (3 -&gt; 4)
+  PASS  settle() still succeeded after the permit was front-run</code></pre>
+
+        <div class="callout warn">
+          <span class="callout-title">Where the fork test stops short.</span>
+          <p>
+            The token is real, but the payer's FXRP balance is
+            <em>synthetic</em> - written straight into the token's balance
+            mapping on the fork, because minting FAssets legitimately requires an
+            XRP payment proof that a test cannot produce. So the fork run proves
+            the contract logic and the signing path; it does not prove a payer
+            funded through the normal FAssets route.
+          </p>
+        </div>
+
+        <h2 id="not-yet">What is not done</h2>
+        <p>
+          <strong>A gasless settlement on live Coston2.</strong>
+          <code>settle.ts</code> is written and has been run against the deployed
+          facilitator on a fork, but not yet on the live chain. That needs a
+          payer wallet holding real FXRP and deliberately zero C2FLR - and that
+          zero is the whole demonstration, so it is worth doing properly rather
+          than approximating.
+        </p>
+        <p>
+          <strong>FTSO pricing.</strong> Invoices are denominated in FXRP today.
+          Quoting in USD and converting at Flare's onchain feed is the next
+          piece, and it is what makes the oracle load-bearing rather than
+          decorative.
+        </p>
+        <p>
+          <strong>The x402 service and the MCP server.</strong> Neither exists
+          yet. The home page describes the flow they will expose; it does not
+          claim they run.
+        </p>
+
+        <h2 id="roadmap">Roadmap</h2>
+        <ol class="steps">
+          <li>
+            <h3>Land a live gasless settlement</h3>
+            <p>
+              A payer with FXRP and zero C2FLR pays an invoice on Coston2, with
+              the transaction hash published here.
+            </p>
+          </li>
+          <li>
+            <h3>Price invoices in USD via FTSO</h3>
+            <p>
+              Read the feed onchain, convert at settlement time, and quote the
+              402 in dollars.
+            </p>
+          </li>
+          <li>
+            <h3>Ship the facilitator service and middleware</h3>
+            <p>
+              So any Flare service can charge for a request in about five lines
+              of Express.
+            </p>
+          </li>
+          <li>
+            <h3>An MCP server</h3>
+            <p>
+              So an assistant can pay for what it uses without a human in the
+              loop.
+            </p>
+          </li>
+        </ol>
+      </main>
+
+      <footer class="site-footer">
+        <div class="footer-cols">
+          <div class="footer-col">
+            <div class="footer-brand">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="5" r="3" fill="#0FA968" />
+                <circle cx="12" cy="12" r="3.6" fill="#0B7A4B" />
+                <circle cx="12" cy="19" r="3" fill="#34E29B" />
+              </svg>
+              SCRIP
+            </div>
+            <p style="color: var(--ink-muted); font-size: 0.94rem; margin: 0">
+              Machine-payable FXRP on Flare.
+            </p>
+          </div>
+          <div class="footer-col">
+            <h4>Project</h4>
+            <a href="./how-it-works">How it works</a>
+            <a href="./contract">Contract</a>
+            <a href="./status">Status</a>
+            <a href="./docs">Docs</a>
+          </div>
+          <div class="footer-col">
+            <h4>Onchain</h4>
+            <a href="https://coston2-explorer.flare.network/address/0x43F672C0a915F59A2472a07D2108936e217cB04C">Facilitator</a>
+            <a href="https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7">FXRP token</a>
+            <a href="https://faucet.flare.network/coston2">Coston2 faucet</a>
+          </div>
+          <div class="footer-col">
+            <h4>Elsewhere</h4>
+            <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
+            <a href="https://dev.flare.network/ftso/getting-started">FTSO docs</a>
+            <a href="https://dorahacks.io/hackathon/flaresummersignal/">Flare Summer Signal</a>
+          </div>
+        </div>
+        <p class="footer-note">
+          Coston2 testnet only. FXRP here is <code>FTestXRP</code>, backed by
+          testnet XRP and holding no market value. MIT licensed.
+        </p>
+      </footer>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

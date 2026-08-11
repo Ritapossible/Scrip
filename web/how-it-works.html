@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>How it works - Scrip</title>
+    <meta
+      name="description"
+      content="The Scrip payment flow: a 402 priced in USD, two offchain signatures from the payer, and a relayer that submits settle() and pays the gas."
+    />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <div class="nav-wrap">
+        <nav class="nav">
+          <button
+            class="nav-toggle"
+            type="button"
+            data-menu-toggle
+            aria-expanded="false"
+            aria-controls="site-menu"
+            aria-label="Open menu"
+          >
+            <span></span><span></span><span></span>
+          </button>
+
+          <a class="nav-mark" href="./">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="5" r="3" fill="#0FA968" />
+              <circle cx="12" cy="12" r="3.6" fill="#0B7A4B" />
+              <circle cx="12" cy="19" r="3" fill="#34E29B" />
+            </svg>
+            SCRIP
+          </a>
+
+          <div class="nav-links">
+            <a href="./how-it-works" aria-current="page">How it works</a>
+            <a href="./contract">Contract</a>
+            <a href="./status">Status</a>
+            <a href="./docs">Docs</a>
+            <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
+            <a class="nav-cta" href="./docs#quickstart">Get Started</a>
+          </div>
+        </nav>
+
+        <div class="menu" id="site-menu" data-menu aria-hidden="true">
+          <a href="./how-it-works" aria-current="page">How it works <span class="hint">two signatures</span></a>
+          <a href="./contract">Contract <span class="hint">deployed + verified</span></a>
+          <a href="./status">Status <span class="hint">what runs today</span></a>
+          <a href="./docs">Docs <span class="hint">run it yourself</span></a>
+          <div class="menu-sep"></div>
+          <a href="./">Home</a>
+          <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
+          <a class="menu-cta" href="./docs#quickstart">Get Started</a>
+        </div>
+      </div>
+      <div class="menu-scrim" data-menu-scrim></div>
+
+      <header class="page-head">
+        <p class="eyebrow">How it works</p>
+        <h1>The agent signs. Someone else pays the gas.</h1>
+        <p class="lede">
+          An agent hits a paid endpoint, gets a price in US dollars, and signs
+          two offchain messages. It never sends a transaction and never holds a
+          gas token.
+        </p>
+      </header>
+
+      <main class="doc">
+        <div class="flow">
+          <svg viewBox="0 0 740 396" role="img" aria-labelledby="flow-title flow-desc">
+            <title id="flow-title">The Scrip payment sequence</title>
+            <desc id="flow-desc">
+              The agent requests a resource and receives HTTP 402 with a price in
+              USD. It signs an EIP-2612 permit and a PaymentIntent offchain and
+              sends both to a relayer. The relayer calls settle() on Flare, which
+              moves FXRP to the payee and emits PaymentSettled. The endpoint then
+              returns the resource to the agent.
+            </desc>
+
+            <!-- lifelines -->
+            <g stroke="rgba(7,42,26,0.16)" stroke-width="1.5" stroke-dasharray="4 5">
+              <line x1="80" y1="62" x2="80" y2="368" />
+              <line x1="290" y1="62" x2="290" y2="368" />
+              <line x1="480" y1="62" x2="480" y2="368" />
+              <line x1="660" y1="62" x2="660" y2="368" />
+            </g>
+
+            <!-- actor chips -->
+            <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700" text-anchor="middle">
+              <rect x="26" y="20" width="108" height="34" rx="17" fill="#072A1A" />
+              <text x="80" y="42" fill="#FFFFFF">Agent</text>
+
+              <rect x="234" y="20" width="112" height="34" rx="17" fill="#EFECE1" />
+              <text x="290" y="42" fill="#072A1A">Endpoint</text>
+
+              <rect x="426" y="20" width="108" height="34" rx="17" fill="#EFECE1" />
+              <text x="480" y="42" fill="#072A1A">Relayer</text>
+
+              <rect x="606" y="20" width="108" height="34" rx="17" fill="#0FA968" />
+              <text x="660" y="42" fill="#FFFFFF">Flare</text>
+            </g>
+
+            <defs>
+              <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" fill="#4A6659" />
+              </marker>
+              <marker id="arw-brand" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" fill="#0FA968" />
+              </marker>
+            </defs>
+
+            <g
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="12.5"
+              fill="#4A6659"
+              stroke="none"
+            >
+              <!-- 1 GET -->
+              <line x1="80" y1="92" x2="284" y2="92" stroke="#4A6659" stroke-width="1.8" marker-end="url(#arw)" />
+              <text x="182" y="84" text-anchor="middle">GET /resource</text>
+
+              <!-- 2 402 -->
+              <line x1="290" y1="126" x2="86" y2="126" stroke="#4A6659" stroke-width="1.8" marker-end="url(#arw)" />
+              <text x="188" y="118" text-anchor="middle" font-weight="700" fill="#072A1A">402 &middot; price in USD</text>
+
+              <!-- 3 self-sign -->
+              <path
+                d="M80 156 h48 a10 10 0 0 1 10 10 v14 a10 10 0 0 1 -10 10 h-42"
+                fill="none"
+                stroke="#0FA968"
+                stroke-width="1.8"
+                marker-end="url(#arw-brand)"
+              />
+              <text x="150" y="164" fill="#072A1A" font-weight="700">signs permit + intent</text>
+              <text x="150" y="182" fill="#4A6659">offchain &middot; no gas &middot; no transaction</text>
+
+              <!-- 4 to relayer -->
+              <line x1="80" y1="224" x2="474" y2="224" stroke="#4A6659" stroke-width="1.8" marker-end="url(#arw)" />
+              <text x="277" y="216" text-anchor="middle">both signatures, over HTTP</text>
+
+              <!-- 5 settle -->
+              <line x1="480" y1="264" x2="654" y2="264" stroke="#0FA968" stroke-width="2.2" marker-end="url(#arw-brand)" />
+              <text x="567" y="256" text-anchor="middle" font-weight="700" fill="#072A1A">settle()</text>
+              <text x="567" y="284" text-anchor="middle">relayer pays the gas</text>
+
+              <!-- 6 settled -->
+              <line x1="660" y1="316" x2="486" y2="316" stroke="#4A6659" stroke-width="1.8" marker-end="url(#arw)" />
+              <text x="573" y="308" text-anchor="middle">PaymentSettled</text>
+
+              <!-- 7 200 -->
+              <line x1="290" y1="356" x2="86" y2="356" stroke="#4A6659" stroke-width="1.8" marker-end="url(#arw)" />
+              <text x="188" y="348" text-anchor="middle" font-weight="700" fill="#072A1A">200 &middot; resource</text>
+            </g>
+          </svg>
+        </div>
+
+        <h2 id="two-signatures">Why two signatures</h2>
+        <p>
+          This is the part that is specific to Flare, and the part most x402
+          implementations get to skip.
+        </p>
+        <p>
+          An <strong>EIP-3009</strong> authorisation - what USDC uses - names its
+          recipient. The signature itself says <em>move X to this address</em>.
+          An <strong>EIP-2612 permit</strong>, which is what FXRP implements,
+          does not. It commits only to
+          <code>(owner, spender, value, nonce, deadline)</code>: it grants an
+          allowance and says nothing about where the money then goes.
+        </p>
+        <p>
+          <code>settle()</code> is permissionless by design, because any relayer
+          should be able to carry a payment. That turns the missing recipient
+          from an omission into a hole: anyone who observed a permit signature -
+          in the mempool, or on the x402 HTTP path it necessarily travels - could
+          call <code>settle()</code> naming themselves as payee.
+        </p>
+
+        <div class="compare">
+          <div class="side">
+            <h3>The permit</h3>
+            <div class="who">signed over FXRP's domain</div>
+            <ul>
+              <li>owner</li>
+              <li>spender</li>
+              <li>value</li>
+              <li>nonce</li>
+              <li>deadline</li>
+            </ul>
+            <p style="margin-top: 12px; font-size: 0.92rem; color: var(--ink-faint)">
+              Authorises an allowance. Says nothing about the destination.
+            </p>
+          </div>
+          <div class="side">
+            <h3>The PaymentIntent</h3>
+            <div class="who">signed over Scrip's own domain</div>
+            <ul>
+              <li>invoiceId</li>
+              <li>payer</li>
+              <li><strong>payee</strong></li>
+              <li>amount</li>
+              <li>deadline</li>
+            </ul>
+            <p style="margin-top: 12px; font-size: 0.92rem; color: var(--ink-faint)">
+              Authorises the destination. Every field a relayer supplies as
+              calldata appears here, so none can be substituted.
+            </p>
+          </div>
+        </div>
+
+        <div class="callout">
+          <p>
+            The permit authorises the allowance; the intent authorises the
+            destination. <strong>Neither is sufficient alone</strong> - which is
+            why a relayer can choose <em>when</em> a payment lands, but nothing
+            about what it is.
+          </p>
+        </div>
+
+        <h2 id="steps">Step by step</h2>
+        <ol class="steps">
+          <li>
+            <h3>The endpoint answers 402</h3>
+            <p>
+              The price is quoted in US dollars, then converted to FXRP at
+              Flare's FTSO rate. The invoice carries an ID that makes the
+              payment single-use.
+            </p>
+          </li>
+          <li>
+            <h3>The agent signs twice, offchain</h3>
+            <p>
+              An EIP-2612 permit over FXRP's domain, and a PaymentIntent over the
+              facilitator's. No transaction, no gas, no chain interaction at all
+              - just two signatures.
+            </p>
+          </li>
+          <li>
+            <h3>A relayer submits <code>settle()</code></h3>
+            <p>
+              The relayer pays the fee. It cannot redirect the payment, inflate
+              the amount, or reuse the invoice, because all three are covered by
+              the intent digest.
+            </p>
+          </li>
+          <li>
+            <h3>The contract measures what arrived</h3>
+            <p>
+              FAssets parameters are asset-manager controlled and may levy a
+              transfer fee, so <code>settle()</code> reads the payee's balance
+              before and after and reverts with <code>Underdelivered</code> if
+              the payee got less than the invoice. A rail that silently underpays
+              is a broken one.
+            </p>
+          </li>
+        </ol>
+
+        <h2 id="frontrunning">What a front-runner can and cannot do</h2>
+        <p>
+          A permit signature is visible the moment it travels. Someone can lift
+          it from the mempool and submit it straight to FXRP, which consumes the
+          payer's nonce. A bare <code>permit</code> call inside
+          <code>settle()</code> would then revert - griefing every payment on the
+          rail for the price of gas.
+        </p>
+        <p>
+          So the permit call is wrapped in <code>try/catch</code>. Swallowing
+          that revert is only safe <em>because</em> the intent already fixed the
+          destination: a griefer who replays the permit merely moves the
+          allowance into place and gains nothing. The allowance is then checked
+          explicitly, so a genuinely missing one still reports itself rather than
+          failing opaquely inside the token.
+        </p>
+        <p>
+          This is tested rather than argued -
+          <a href="./status#verified">see what is verified</a>.
+        </p>
+
+        <h2 id="limitations">Known limitations</h2>
+        <p>
+          EIP-2612 nonces are sequential per payer, so an agent paying two
+          endpoints concurrently will have the second permit fail on a consumed
+          nonce. EIP-3009's random nonces avoid this, but FXRP does not implement
+          EIP-3009. Payments are serialised per payer until that is addressed.
+        </p>
+        <p>
+          <code>settled</code> is keyed on <code>invoiceId</code> alone rather
+          than <code>(invoiceId, payer)</code>. Invoice IDs travel the x402 HTTP
+          path, so anyone who sees one can settle their own payment against it
+          first and burn it for the intended payer. No funds are at risk - the
+          intent still binds payer, payee and amount - but the service has to
+          reissue. Namespacing invoice IDs per payer would close it.
+        </p>
+      </main>
+
+      <footer class="site-footer">
+        <div class="footer-cols">
+          <div class="footer-col">
+            <div class="footer-brand">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="5" r="3" fill="#0FA968" />
+                <circle cx="12" cy="12" r="3.6" fill="#0B7A4B" />
+                <circle cx="12" cy="19" r="3" fill="#34E29B" />
+              </svg>
+              SCRIP
+            </div>
+            <p style="color: var(--ink-muted); font-size: 0.94rem; margin: 0">
+              Machine-payable FXRP on Flare.
+            </p>
+          </div>
+          <div class="footer-col">
+            <h4>Project</h4>
+            <a href="./how-it-works">How it works</a>
+            <a href="./contract">Contract</a>
+            <a href="./status">Status</a>
+            <a href="./docs">Docs</a>
+          </div>
+          <div class="footer-col">
+            <h4>Onchain</h4>
+            <a href="https://coston2-explorer.flare.network/address/0x43F672C0a915F59A2472a07D2108936e217cB04C">Facilitator</a>
+            <a href="https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7">FXRP token</a>
+            <a href="https://faucet.flare.network/coston2">Coston2 faucet</a>
+          </div>
+          <div class="footer-col">
+            <h4>Elsewhere</h4>
+            <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
+            <a href="https://dev.flare.network/ftso/getting-started">FTSO docs</a>
+            <a href="https://dorahacks.io/hackathon/flaresummersignal/">Flare Summer Signal</a>
+          </div>
+        </div>
+        <p class="footer-note">
+          Coston2 testnet only. FXRP here is <code>FTestXRP</code>, backed by
+          testnet XRP and holding no market value. MIT licensed.
+        </p>
+      </footer>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

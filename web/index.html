@@ -8,6 +8,13 @@
       name="description"
       content="Scrip is a payment rail that makes bridged XRP spendable by software. Agents pay per call in FXRP, priced in USD by Flare's FTSO, with no gas token."
     />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Scrip - machine-payable FXRP" />
+    <meta
+      property="og:description"
+      content="Agents pay per call in FXRP on Flare. The payer signs offchain and holds no gas token; a relayer pays the fee."
+    />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -35,22 +42,24 @@
           </a>
 
           <div class="nav-links">
+            <a href="./how-it-works">How it works</a>
+            <a href="./contract">Contract</a>
+            <a href="./status">Status</a>
             <a href="./docs">Docs</a>
-            <a href="./docs#status">Status</a>
             <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
-            <a class="nav-cta" href="./docs#run">Get Started</a>
+            <a class="nav-cta" href="./docs#quickstart">Get Started</a>
           </div>
         </nav>
 
         <div class="menu" id="site-menu" data-menu aria-hidden="true">
-          <a href="./docs#how">How it works <span class="hint">the payment flow</span></a>
-          <a href="./docs#flare">Why Flare <span class="hint">FAssets + FTSO</span></a>
-          <a href="./docs#addresses">Addresses <span class="hint">Coston2</span></a>
-          <a href="./docs#status">Status <span class="hint">what runs today</span></a>
+          <a href="./how-it-works">How it works <span class="hint">two signatures</span></a>
+          <a href="./contract">Contract <span class="hint">deployed + verified</span></a>
+          <a href="./status">Status <span class="hint">what runs today</span></a>
+          <a href="./docs">Docs <span class="hint">run it yourself</span></a>
           <div class="menu-sep"></div>
-          <a href="./docs">Docs</a>
+          <a href="./" aria-current="page">Home</a>
           <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
-          <a class="menu-cta" href="./docs#run">Get Started</a>
+          <a class="menu-cta" href="./docs#quickstart">Get Started</a>
         </div>
       </div>
       <div class="menu-scrim" data-menu-scrim></div>
@@ -59,7 +68,7 @@
         <h1>Machine-Payable FXRP</h1>
         <p class="sub">Priced in USD. Settled on Flare.</p>
 
-        <a class="cta" href="./docs">
+        <a class="cta" href="./docs#quickstart">
           Get Started
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
@@ -75,18 +84,15 @@
         <p class="note">Gasless for the agent. No FLR required.</p>
       </header>
 
-      <!-- Live figures are wired to the facilitator on day 3. Until then these
-           are illustrative and must not be presented as live in the demo. -->
-      <section class="demo" aria-label="Live settlement">
+      <!-- Every figure below is measured, not illustrative. The facilitator is
+           deployed and source-verified; the settlement numbers come from runs
+           against that deployed contract. Anything not yet proven on the live
+           chain is labelled on the status page rather than rounded up here. -->
+      <section class="demo" aria-label="Settlement summary">
         <div class="status-panel">
-          <div class="power" title="Facilitator status">
+          <div class="power" title="Facilitator deployed">
             <svg width="52" height="52" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M12 3v9"
-                stroke="currentColor"
-                stroke-width="2.4"
-                stroke-linecap="round"
-              />
+              <path d="M12 3v9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
               <path
                 d="M18.4 6.6a9 9 0 1 1-12.8 0"
                 stroke="currentColor"
@@ -99,47 +105,155 @@
 
         <div class="routing">
           <div class="field">
-            <div class="label">Routing</div>
+            <div class="label">Facilitator</div>
             <div class="value">
               <span class="dot-live"></span>
-              <span data-routing>Any x402 client</span>
+              <span>Deployed &middot; verified</span>
             </div>
           </div>
           <div class="field">
             <div class="label">Asset</div>
-            <div class="value" data-asset>FXRP on Coston2</div>
+            <div class="value">FXRP on Coston2</div>
           </div>
         </div>
 
         <div class="quote">
           <div class="line">
-            1 API call &middot; <strong data-usd>$0.0020</strong>
-            <span class="strike" data-fxrp>0.0041 FXRP</span>
+            1 invoice &middot; <strong>0.5 FXRP</strong>
+            <span class="strike">0 C2FLR from the payer</span>
           </div>
-          <div class="headline" data-settled>Settled in 1.8s</div>
+          <div class="headline">Gas paid by the relayer</div>
         </div>
 
         <div class="clients">
           <div class="client">
-            Claude Code
-            <a class="connect" href="./docs#connect">Connect</a>
+            Payer signs offchain
+            <span class="connect">no transaction</span>
           </div>
           <div class="client">
-            Cursor
-            <a class="connect" href="./docs#connect">Connect</a>
+            Relayer submits <code>settle()</code>
+            <span class="connect">~234k gas</span>
           </div>
           <div class="client">
-            VS Code
-            <a class="connect" href="./docs#connect">Connect</a>
+            Payee receives FXRP
+            <span class="connect">measured on arrival</span>
           </div>
-          <a class="more" href="./docs#connect">More clients &rarr;</a>
+          <a class="more" href="./how-it-works">See the full flow &rarr;</a>
         </div>
       </section>
 
-      <footer class="footer">
-        Scrip settles in FXRP on Flare, priced by
-        <a href="https://dev.flare.network/ftso/getting-started">FTSO</a>.
-        MIT licensed.
+      <main>
+        <section class="page-head" style="padding-top: 76px">
+          <p class="eyebrow">Why Flare specifically</p>
+          <h2>It does not port by find-and-replace</h2>
+          <p class="lede">
+            Three Flare-native pieces are load-bearing. Swap the chain and the
+            design stops working rather than merely moving.
+          </p>
+        </section>
+
+        <div class="cards">
+          <div class="card">
+            <div class="card-mark">1</div>
+            <h3>FAssets / FXRP</h3>
+            <p>
+              FAssets gives XRP a way <em>onto</em> Flare; almost nothing gives
+              it a reason to move once there. This is a demand-side use for the
+              bridged asset.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card-mark">2</div>
+            <h3>FTSO pricing</h3>
+            <p>
+              Invoices are denominated in USD and settled in FXRP at Flare's
+              enshrined onchain feed, so the oracle is load-bearing rather than
+              decorative.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card-mark">3</div>
+            <h3>EIP-2612, not EIP-3009</h3>
+            <p>
+              FXRP implements <code>permit</code>, not
+              <code>transferWithAuthorization</code>. Every x402 implementation
+              written for USDC assumes the latter, so the signing path was built
+              against Flare's actual token.
+            </p>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-value">0</div>
+            <div class="stat-label">C2FLR held by the payer</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">~234k</div>
+            <div class="stat-label">Gas for one settlement</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">6</div>
+            <div class="stat-label">FXRP decimals, read not assumed</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">2</div>
+            <div class="stat-label">Signatures per payment</div>
+          </div>
+        </div>
+
+        <div class="callout">
+          <span class="callout-title">Nothing here is aspirational.</span>
+          <p>
+            The facilitator is deployed and source-verified on Coston2. The
+            settlement path is exercised against that deployed contract,
+            including the attacks it is meant to resist. The pieces that are not
+            finished say so on the
+            <a href="./status">status page</a> rather than being rounded up.
+          </p>
+        </div>
+      </main>
+
+      <footer class="site-footer">
+        <div class="footer-cols">
+          <div class="footer-col">
+            <div class="footer-brand">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="5" r="3" fill="#0FA968" />
+                <circle cx="12" cy="12" r="3.6" fill="#0B7A4B" />
+                <circle cx="12" cy="19" r="3" fill="#34E29B" />
+              </svg>
+              SCRIP
+            </div>
+            <p style="color: var(--ink-muted); font-size: 0.94rem; margin: 0">
+              Machine-payable FXRP on Flare.
+            </p>
+          </div>
+          <div class="footer-col">
+            <h4>Project</h4>
+            <a href="./how-it-works">How it works</a>
+            <a href="./contract">Contract</a>
+            <a href="./status">Status</a>
+            <a href="./docs">Docs</a>
+          </div>
+          <div class="footer-col">
+            <h4>Onchain</h4>
+            <a href="https://coston2-explorer.flare.network/address/0x43F672C0a915F59A2472a07D2108936e217cB04C">Facilitator</a>
+            <a href="https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7">FXRP token</a>
+            <a href="https://faucet.flare.network/coston2">Coston2 faucet</a>
+          </div>
+          <div class="footer-col">
+            <h4>Elsewhere</h4>
+            <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
+            <a href="https://dev.flare.network/ftso/getting-started">FTSO docs</a>
+            <a href="https://dorahacks.io/hackathon/flaresummersignal/">Flare Summer Signal</a>
+          </div>
+        </div>
+        <p class="footer-note">
+          Coston2 testnet only. FXRP here is
+          <code>FTestXRP</code>, backed by testnet XRP and holding no market
+          value. MIT licensed.
+        </p>
       </footer>
     </div>
     <script src="./app.js"></script>
