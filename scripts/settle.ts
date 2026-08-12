@@ -23,88 +23,24 @@ import {
   createPublicClient,
   createWalletClient,
   http,
-  parseAbi,
   keccak256,
   toBytes,
   parseUnits,
   formatUnits,
   getAddress,
   decodeEventLog,
-  hashTypedData,
   BaseError,
   ContractFunctionRevertedError,
-  type Address,
   type Hex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { coston2, FLARE_CONTRACT_REGISTRY, txUrl, addressUrl } from "../src/chain.js";
-
-const registryAbi = parseAbi([
-  "function getContractAddressByName(string _name) view returns (address)",
-]);
-
-const assetManagerAbi = parseAbi(["function fAsset() view returns (address)"]);
-
-const fxrpAbi = parseAbi([
-  "function decimals() view returns (uint8)",
-  "function symbol() view returns (string)",
-  "function balanceOf(address) view returns (uint256)",
-  "function nonces(address) view returns (uint256)",
-  "function eip712Domain() view returns (bytes1 fields, string name, string version, uint256 chainId, address verifyingContract, bytes32 salt, uint256[] extensions)",
-]);
-
-const facilitatorAbi = parseAbi([
-  "struct PaymentIntent { bytes32 invoiceId; address payer; address payee; uint256 amount; uint256 deadline; }",
-  "struct Signature { uint8 v; bytes32 r; bytes32 s; }",
-  "function settle(PaymentIntent intent, Signature permitSig, Signature intentSig)",
-  "function intentDigest(PaymentIntent intent) view returns (bytes32)",
-  "function token() view returns (address)",
-  "function settled(bytes32) view returns (bool)",
-  "event PaymentSettled(bytes32 indexed invoiceId, address indexed payer, address indexed payee, uint256 requested, uint256 delivered)",
-  // Without these a revert decodes to a bare selector and every failure looks
-  // the same.
-  "error AlreadySettled(bytes32 invoiceId)",
-  "error Underdelivered(uint256 requested, uint256 delivered)",
-  "error Expired(uint256 deadline, uint256 nowTime)",
-  "error IntentNotSignedByPayer(address recovered, address payer)",
-  "error MalleableSignature()",
-  "error BadSignatureV(uint8 v)",
-  "error InsufficientAllowance(uint256 have, uint256 need)",
-  "error TransferFailed()",
-  "error ZeroPayee()",
-]);
-
-const permitTypes = {
-  Permit: [
-    { name: "owner", type: "address" },
-    { name: "spender", type: "address" },
-    { name: "value", type: "uint256" },
-    { name: "nonce", type: "uint256" },
-    { name: "deadline", type: "uint256" },
-  ],
-} as const;
-
-const intentTypes = {
-  PaymentIntent: [
-    { name: "invoiceId", type: "bytes32" },
-    { name: "payer", type: "address" },
-    { name: "payee", type: "address" },
-    { name: "amount", type: "uint256" },
-    { name: "deadline", type: "uint256" },
-  ],
-} as const;
+import { coston2, txUrl, addressUrl } from "../src/chain.js";
+import { fxrpAbi, facilitatorAbi, explainRevert } from "../src/abi.js";
+import { resolveFxrp } from "../src/fxrp.js";
+import { permitTypes, intentTypes, intentDomain, intentDigest, split } from "../src/eip712.js";
 
 function line(label: string, value: string): void {
   console.log(`  ${label.padEnd(22)} ${value}`);
-}
-
-/** viem returns a packed 65-byte signature; the contract takes v, r, s. */
-function split(sig: Hex): { v: number; r: Hex; s: Hex } {
-  return {
-    r: `0x${sig.slice(2, 66)}` as Hex,
-    s: `0x${sig.slice(66, 130)}` as Hex,
-    v: parseInt(sig.slice(130, 132), 16),
-  };
 }
 
 function required(name: string): string {
@@ -129,23 +65,13 @@ async function main(): Promise<void> {
   console.log("\nScrip settle - Coston2\n");
 
   // --- resolve, never hardcode ---------------------------------------------
-  const assetManager = await client.readContract({
-    address: FLARE_CONTRACT_REGISTRY,
-    abi: registryAbi,
-    functionName: "getContractAddressByName",
-    args: ["AssetManagerFXRP"],
-  });
-  const fxrp = await client.readContract({
-    address: assetManager,
-    abi: assetManagerAbi,
-    functionName: "fAsset",
-  });
+  const { address: fxrp, decimals, symbol, domain: tokenDomain } = await resolveFxrp(client);
 
-  const [decimals, symbol, boundToken] = await Promise.all([
-    client.readContract({ address: fxrp, abi: fxrpAbi, functionName: "decimals" }),
-    client.readContract({ address: fxrp, abi: fxrpAbi, functionName: "symbol" }),
-    client.readContract({ address: facilitator, abi: facilitatorAbi, functionName: "token" }),
-  ]);
+  const boundToken = await client.readContract({
+    address: facilitator,
+    abi: facilitatorAbi,
+    functionName: "token",
+  });
 
   // token is immutable, so a facilitator bound to a stale FXRP can never be
   // fixed - only redeployed. Better to find out here than inside a revert.
@@ -197,18 +123,6 @@ async function main(): Promise<void> {
   }
 
   // --- sign: offchain, no gas, no transaction -------------------------------
-  const domain = await client.readContract({
-    address: fxrp,
-    abi: fxrpAbi,
-    functionName: "eip712Domain",
-  });
-  const tokenDomain = {
-    name: domain[1],
-    version: domain[2],
-    chainId: Number(domain[3]),
-    verifyingContract: domain[4],
-  } as const;
-
   // One deadline governs both signatures. An hour is generous for a testnet
   // whose public RPC is slow on a cold call; DEADLINE_SECONDS exists so the
   // expiry path can be forced with a negative value rather than waited out.
@@ -245,19 +159,7 @@ async function main(): Promise<void> {
   ]);
   if (alreadySettled) throw new Error(`invoice ${invoiceId} has already been settled.`);
 
-  const intentDomain = {
-    name: "Scrip",
-    version: "1",
-    chainId: coston2.id,
-    verifyingContract: facilitator,
-  } as const;
-
-  const localDigest = hashTypedData({
-    domain: intentDomain,
-    types: intentTypes,
-    primaryType: "PaymentIntent",
-    message: intent,
-  });
+  const localDigest = intentDigest(facilitator, intent);
 
   console.log("\nsigning");
   line("token domain", `${tokenDomain.name} v${tokenDomain.version}`);
@@ -291,7 +193,7 @@ async function main(): Promise<void> {
 
   const intentSig = split(
     await payer.signTypedData({
-      domain: intentDomain,
+      domain: intentDomain(facilitator),
       types: intentTypes,
       primaryType: "PaymentIntent",
       message: intent,
@@ -355,37 +257,6 @@ async function main(): Promise<void> {
       : "\n  the payment settled, but the payer held C2FLR so this run does not " +
           "demonstrate gaslessness. Drain the payer and run it again.\n",
   );
-}
-
-/**
- * Every custom error the facilitator can raise, said in a sentence. The nine
- * signatures are in facilitatorAbi so viem can decode a revert; without this
- * they still arrive as a name and a tuple, which is only marginally better than
- * a bare selector when the demo is on a clock.
- */
-function explainRevert(name: string, args: readonly unknown[]): string {
-  switch (name) {
-    case "Expired":
-      return `the deadline passed before the transaction was mined (deadline ${args[0]}, block time ${args[1]}). The public Coston2 RPC can be slow - just run it again.`;
-    case "AlreadySettled":
-      return `invoice ${args[0]} was already settled. Invoice IDs are single-use.`;
-    case "IntentNotSignedByPayer":
-      return `the intent signature recovered to ${args[0]}, not the payer ${args[1]}. The signer and the contract disagree about the EIP-712 domain or the intent fields.`;
-    case "InsufficientAllowance":
-      return `the permit did not grant enough allowance (have ${args[0]}, need ${args[1]}). The permit signature was probably rejected by the token - check the payer's nonce.`;
-    case "Underdelivered":
-      return `the payee received ${args[1]} but the invoice was for ${args[0]}. FXRP is levying a transfer fee, so the invoice cannot be settled at face value.`;
-    case "TransferFailed":
-      return "FXRP's transferFrom failed or returned false.";
-    case "ZeroPayee":
-      return "PAYEE_ADDRESS is the zero address.";
-    case "MalleableSignature":
-      return "a signature had a high-half-order s value. The signer is not normalising to EIP-2.";
-    case "BadSignatureV":
-      return `signature v was ${args[0]}, expected 27 or 28.`;
-    default:
-      return `${name}(${args.join(", ")})`;
-  }
 }
 
 main().catch((err: unknown) => {

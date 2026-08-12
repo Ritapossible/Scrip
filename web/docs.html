@@ -101,9 +101,39 @@ npm run web       # http://127.0.0.1:8080</code></pre>
                 <td>Settles a real invoice against a fork of live Coston2, including the attacks.</td>
               </tr>
               <tr>
+                <td><code>npm run price</code></td>
+                <td>nothing</td>
+                <td>Reads the live XRP/USD FTSO feed and prices a USD invoice in FXRP.</td>
+              </tr>
+              <tr>
+                <td><code>npm run setup</code></td>
+                <td><code>RELAYER_PK</code></td>
+                <td>Generates a fresh payer that has never held gas, and writes <code>.env</code>.</td>
+              </tr>
+              <tr>
+                <td><code>npm run fund</code></td>
+                <td>a funded relayer</td>
+                <td>Moves FXRP to the payer. Refuses if the payer holds any C2FLR.</td>
+              </tr>
+              <tr>
                 <td><code>npm run settle</code></td>
                 <td>a funded <code>.env</code></td>
                 <td>Signs and settles one invoice gaslessly against the deployed facilitator.</td>
+              </tr>
+              <tr>
+                <td><code>npm run serve:x402</code></td>
+                <td>a funded <code>.env</code></td>
+                <td>Runs the facilitator (<code>/verify</code>, <code>/settle</code>) and a $0.25 paid endpoint.</td>
+              </tr>
+              <tr>
+                <td><code>npm run agent</code></td>
+                <td>a funded payer</td>
+                <td>Hits the paid endpoint, gets a 402, pays it, gets the resource.</td>
+              </tr>
+              <tr>
+                <td><code>npm run typecheck</code></td>
+                <td>nothing</td>
+                <td>Typechecks every script and module.</td>
               </tr>
               <tr>
                 <td><code>npm run web</code></td>
@@ -179,12 +209,22 @@ npm run test:fork</code></pre>
           </div>
         </div>
         <p>
-          Fund them from the
+          Fund one wallet from the
           <a href="https://faucet.flare.network/coston2">Coston2 faucet</a>, which
-          dispenses both C2FLR and FXRP. Send the payer's C2FLR away afterwards -
-          <code>settle.ts</code> tells you if the payer still holds any, because
-          a run with a funded payer does not demonstrate anything.
+          dispenses both C2FLR and FXRP, then let the setup script do the rest:
         </p>
+        <pre><code>RELAYER_PK=0x&lt;that wallet's key&gt; npm run setup
+npm run fund -- 2</code></pre>
+        <div class="callout warn">
+          <span class="callout-title">Why the payer is generated, not reused.</span>
+          <p>
+            <code>settle.ts</code> asserts the payer's native balance is
+            <em>exactly</em> zero, and no wallet can be drained to exactly zero -
+            the drain transaction burns gas and leaves dust behind. Only an
+            account that has never received C2FLR satisfies that equality, so the
+            payer is created fresh and funded with FXRP alone.
+          </p>
+        </div>
         <pre><code>npm run settle           # pays 0.5 FXRP
 npm run settle -- 1.25   # pays 1.25 FXRP</code></pre>
         <p>
@@ -194,6 +234,35 @@ npm run settle -- 1.25   # pays 1.25 FXRP</code></pre>
           has no gas, or the invoice was already settled. A revert comes back as
           a sentence rather than a stack trace.
         </p>
+
+        <h2 id="x402">Charging for a route</h2>
+        <p>
+          The middleware turns any Express route into a paid one. The price is in
+          dollars; the FXRP amount is computed at the live FTSO rate when the
+          quote is issued.
+        </p>
+        <pre><code>app.get(
+  "/api/haiku",
+  requirePayment({ facilitator, payee, usd: "0.25" }),
+  (req, res) =&gt; res.json({ haiku: HAIKU }),
+);</code></pre>
+        <p>
+          An unpaid request gets a <code>402</code> carrying the price, the
+          amount, the rate it was derived from, and the invoice ID to sign. A
+          request with a valid <code>X-PAYMENT</code> header is settled on chain
+          and then handed to the route as though it had been free, with the
+          receipt in <code>X-PAYMENT-RESPONSE</code>.
+        </p>
+        <div class="callout">
+          <span class="callout-title">The scheme is <code>exact-permit2612</code>.</span>
+          <p>
+            Every x402 implementation in the wild is written against USDC, whose
+            EIP-3009 authorisation names its recipient inside the signed message.
+            FXRP implements EIP-2612 <code>permit</code>, which does not - so this
+            rail needs a second signature and says so in the scheme name. A
+            USDC-shaped client finds out from the name rather than from a revert.
+          </p>
+        </div>
 
         <h2 id="env">Environment</h2>
         <div class="table-wrap">
@@ -209,6 +278,8 @@ npm run settle -- 1.25   # pays 1.25 FXRP</code></pre>
               <tr><td><code>FACILITATOR_ADDRESS</code></td><td>The deployed contract. Already filled in.</td></tr>
               <tr><td><code>DEADLINE_SECONDS</code></td><td>Signature lifetime, default 3600.</td></tr>
               <tr><td><code>INVOICE_ID</code></td><td>Optional fixed invoice ID. Random per run otherwise.</td></tr>
+              <tr><td><code>PORT</code></td><td>Port for the x402 service, default 8402.</td></tr>
+              <tr><td><code>SCRIP_INVOICE_SECRET</code></td><td>Signs invoice IDs. Without it, quotes do not survive a restart.</td></tr>
             </tbody>
           </table>
         </div>

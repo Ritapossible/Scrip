@@ -21,11 +21,14 @@ live Coston2.
 | Chain probe - resolves FXRP, verifies the EIP-712 domain | working, live Coston2 |
 | `ScripFacilitator.sol` | deployed and source-verified on Coston2 |
 | `settle()` end to end - real FXRP, real signatures | working, on a fork of live Coston2 |
-| Gasless settlement (`settle.ts`) | written; runs against the deployed facilitator on a fork. Not yet run on live Coston2 - needs a payer funded with FXRP |
-| FTSO USD pricing | next |
-| x402 facilitator service + Express middleware | next |
-| MCP server so an assistant can spend | next |
-| Live figures on the web dashboard | placeholders, wired after settlement lands |
+| Gasless settlement (`settle.ts`) | **working, live Coston2** - [tx `0x4bea1e37`][tx1] |
+| FTSO USD pricing | **working, live Coston2** - invoices priced at the live XRP/USD feed |
+| x402 facilitator service + Express middleware | **working, live Coston2** |
+| An agent paying a 402 holding no gas token | **working, live Coston2** - [tx `0x975a5ac6`][tx2] |
+| MCP server so an assistant can spend | not built |
+
+[tx1]: https://coston2-explorer.flare.network/tx/0x4bea1e3775332d6f289a66ced078caa400ae3b524b4097a2b41b39d22147d2b4
+[tx2]: https://coston2-explorer.flare.network/tx/0x975a5ac6625db3e292cd4e12c3952a3e2daa6178fd04297a1158ea3c68c336d2
 
 ---
 
@@ -108,6 +111,86 @@ Three results from the live run:
 
 ---
 
+## The rail, end to end, on live Coston2
+
+`npm run serve:x402` starts the facilitator and one paid endpoint.
+`npm run agent` is an agent with FXRP, no gas token, and no idea what anything
+costs until it asks.
+
+The facilitator exposes `GET /supported`, `POST /verify` and `POST /settle`, so
+a resource server can point at it without running a relayer or holding a key. A
+client speaking the USDC dialect of x402 is turned away with a reason rather
+than a revert:
+
+```
+$ curl -s -X POST localhost:8402/verify \
+    -H 'content-type: application/json' \
+    -d '{"x402Version":1,"scheme":"exact"}'
+
+{"valid":false,"reason":"unsupported scheme \"exact\". This rail settles FXRP,
+which implements EIP-2612 permit rather than EIP-3009, so it uses
+\"exact-permit2612\" and requires two signatures: a permit and a PaymentIntent."}
+```
+
+The `content-type` header matters: without it `express.json()` skips the body
+and you get a complaint about a missing `x402Version` instead.
+
+```
+402 payment required
+  price              $0.25
+  amount             0.244356 FTestXRP
+  XRP/USD            $1.023099
+  invoice            0xdeb6e1c4...
+  PASS  quoted amount matches the quoted rate
+  PASS  intent digest agrees with the facilitator
+
+signed two messages, sent no transaction
+
+200 OK
+  {"haiku":["Ledger holds its breath","a signature, then the coin","moves without a fee"]}
+
+settled
+  tx                 0x975a5ac6625db3e292cd4e12c3952a3e2daa6178fd04297a1158ea3c68c336d2
+  block              33961951
+  delivered          0.244356 FTestXRP
+  gas used           205702
+  gas paid by        0xaA34e14a0e0B2fdD8Ad10F06bC0907fA0b1D02Bd
+  payer C2FLR        0 -> 0
+
+  PASS  the agent paid for an API call holding no gas token at all
+```
+
+Charging for a route is one argument:
+
+```ts
+app.get("/api/haiku", requirePayment({ facilitator, payee, usd: "0.25" }), (req, res) => {
+  res.json({ haiku: HAIKU });
+});
+```
+
+Three details worth knowing:
+
+**The scheme is `exact-permit2612`, not `exact`.** Every x402 implementation in
+the wild is written against USDC, whose EIP-3009 authorisation names its
+recipient inside the signed message. FXRP implements EIP-2612 `permit`, which
+does not. A USDC-shaped client would produce a signature this rail cannot use,
+so it is told that by the scheme name rather than by a revert.
+
+**The agent checks the invoice before paying it.** It recomputes the FXRP amount
+from the rate the server showed its working for, and refuses if they disagree.
+It also checks its locally built intent digest against the facilitator's own
+`intentDigest()` before signing. A client that signs whatever a server puts in
+front of it is not a payment rail.
+
+**Quotes are stateless.** The invoice id is an HMAC over
+(resource, amount, deadline) keyed by a server secret, so a returning payment
+proves the service issued that exact quote without anything having been stored.
+An in-memory map of issued invoices would be wrong behind a load balancer and
+forgetful across a restart, and both failures look like a client that paid and
+got nothing.
+
+---
+
 ## What the fork test proves
 
 `npm run test:fork` forks live Coston2, deploys the facilitator onto the fork,
@@ -154,6 +237,14 @@ Five properties, each asserted rather than asserted-about:
 33930955, tx
 `0x2bf4a067e1cbfc75a560639a1157f5ae059d35158568df342f47a7777f152aa9`.
 
+Two payments on live Coston2, both with the payer's C2FLR at zero before and
+after:
+
+| Payment | Block | Gas | Transaction |
+|---|---|---|---|
+| 0.5 FXRP, direct | 33961376 | 222,790 | [`0x4bea1e37`][tx1] |
+| $0.25 via x402 | 33961951 | 205,702 | [`0x975a5ac6`][tx2] |
+
 [fac]: https://coston2-explorer.flare.network/address/0x43F672C0a915F59A2472a07D2108936e217cB04C
 
 The testnet token reports its symbol as `FTestXRP` and its name as `FXRP`. Use
@@ -178,24 +269,46 @@ without an extension, which production resolves through Vercel's `cleanUrls`. A
 plain server returns 404 for it, so the Docs link and every menu entry look
 broken when the site is fine.
 
-To go further, copy `.env.example` to `.env` and fill in three throwaway
-wallets:
+To go further you need two funded wallets. Fund one from the
+[Coston2 faucet](https://faucet.flare.network/coston2) - it dispenses both C2FLR
+and FXRP - then:
+
+```bash
+RELAYER_PK=0x<that wallet's key> npm run setup   # generates a fresh payer, writes .env
+npm run fund -- 2                                # moves 2 FXRP to the payer
+```
+
+That gives you the three roles the rail needs:
 
 - **PAYER** holds FXRP and deliberately **zero C2FLR**. That zero is the proof:
   it is what makes the payment gasless from the agent's side.
 - **RELAYER** holds C2FLR only and pays every gas fee.
-- **PAYEE** just receives.
+- **PAYEE** just receives. It defaults to the relayer, which is fine - nothing
+  requires them to differ.
 
-Fund them from the [Coston2 faucet](https://faucet.flare.network/coston2), which
-dispenses both C2FLR and FXRP. Send the payer's C2FLR away after funding - a
-zero native balance is what the demo proves, and `settle.ts` says so if the
-payer still holds any.
+The payer is generated fresh rather than reused from a funded wallet on purpose.
+`settle.ts` asserts the payer's native balance is *exactly* zero, and you cannot
+drain an account to exactly zero - the drain transaction burns gas and leaves
+dust. Only a wallet that has never received C2FLR satisfies that equality.
 
-Then settle an invoice against the deployed facilitator:
+Then price something, and settle it:
 
 ```bash
-npm run settle           # pays 0.5 FXRP
+npm run price            # what is $0.25 in FXRP right now?
+npm run settle           # pays 0.5 FXRP against the deployed facilitator
 npm run settle -- 1.25   # pays 1.25 FXRP
+```
+
+Or run the whole HTTP rail - in one terminal:
+
+```bash
+npm run serve:x402       # facilitator + a $0.25 endpoint on :8402
+```
+
+and in another:
+
+```bash
+npm run agent            # gets a 402, pays it, gets the resource
 ```
 
 It resolves FXRP through the registry, checks its locally built EIP-712 digest
@@ -218,13 +331,28 @@ contracts/
   ScripFacilitator.sol   settles one invoice, binds it, checks delivery
 src/
   chain.ts               Coston2 definition + the contract registry address
+  abi.ts                 every ABI, and every revert said in a sentence
+  eip712.ts              the two signatures a payment needs, and their domains
+  fxrp.ts                registry -> AssetManagerFXRP -> fAsset(), never hardcoded
+  ftso.ts                XRP/USD feed, and USD -> FXRP conversion
+  x402.ts                the wire format: 402 body, X-PAYMENT, X-PAYMENT-RESPONSE
+  facilitator.ts         verify() and settle() against the chain
+  middleware.ts          requirePayment() - charge for an Express route
 scripts/
   probe.ts               read-only: resolve FXRP, verify the signing domain
+  price.ts               read-only: what is $X in FXRP right now?
+  setup-wallets.mjs      generates a fresh payer, writes .env
+  fund-payer.ts          moves FXRP to the payer, keeps its C2FLR at zero
   settle.ts              signs and settles one invoice, gaslessly
+  serve-x402.ts          the facilitator service + a paid endpoint
+  agent.ts               an agent that pays a 402 holding no gas token
   settle-fork-test.mjs   settles a real invoice against a fork of live Coston2
   serve-web.mjs          local server matching production URL rules
 web/
   index.html             landing page
+  how-it-works.html      the flow, and why it takes two signatures
+  contract.html          the facilitator, annotated
+  status.html            what runs, what does not, and the receipts
   docs.html              reference
   app.js                 site menu
   styles.css             design system
@@ -246,13 +374,24 @@ payment against it first and burn it for the intended payer. No funds are at
 risk - the intent still binds payer, payee and amount - but the service has to
 reissue. Namespacing invoice IDs per payer would close it.
 
+`POST /settle` is unauthenticated. Anyone who can reach the facilitator can make
+its relayer pay gas for a payment to an arbitrary payee. Permissionless
+settlement is the contract's design - it is why the PaymentIntent exists at all -
+but a facilitator exposed to the open internet needs a payee allowlist or rate
+limiting on top, and this one has neither.
+
+`SCRIP_INVOICE_SECRET` should be set in any deployment that restarts. Without
+it the service generates a random key per process, so a quote issued before a
+restart is rejected after it. It warns at startup when it does this.
+
 ---
 
 ## Roadmap
 
-Land a gasless settlement against the deployed facilitator on live Coston2, add
-FTSO pricing, then ship the x402 facilitator service and the Express middleware
-so any Flare service can charge for a request in about five lines.
+Ship an MCP server so an assistant can spend through the rail directly, namespace
+invoice IDs per payer to close the burn, and take the signing path to mainnet
+FXRP - where the facilitator would need redeploying and auditing against the real
+asset.
 
 ---
 

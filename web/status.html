@@ -93,16 +93,20 @@
                 <td><span class="pill">verified on a fork</span></td>
               </tr>
               <tr>
-                <td><code>settle.ts</code> against live Coston2</td>
-                <td><span class="pill pending">needs a funded payer</span></td>
+                <td>Gasless settlement against the deployed facilitator</td>
+                <td><span class="pill">live Coston2</span></td>
               </tr>
               <tr>
-                <td>FTSO USD pricing</td>
-                <td><span class="pill pending">next</span></td>
+                <td>FTSO USD pricing - invoices priced at the live XRP/USD feed</td>
+                <td><span class="pill">live Coston2</span></td>
               </tr>
               <tr>
                 <td>x402 facilitator service + Express middleware</td>
-                <td><span class="pill pending">next</span></td>
+                <td><span class="pill">runs locally, settles on live Coston2</span></td>
+              </tr>
+              <tr>
+                <td>An agent paying a 402 end to end, holding no gas token</td>
+                <td><span class="pill">runs locally, settles on live Coston2</span></td>
               </tr>
               <tr>
                 <td>MCP server so an assistant can spend</td>
@@ -111,6 +115,71 @@
             </tbody>
           </table>
         </div>
+
+        <h2 id="live">The payments that actually happened</h2>
+        <p>
+          Transactions on live Coston2, all paid for by the relayer, all from a
+          payer whose C2FLR balance was zero before and after. These are the
+          receipts behind every claim on this site. The service that produced the
+          x402 one runs locally - <code>npm run serve:x402</code> - but the
+          settlements it makes are on the public chain, which is what these
+          hashes are.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>What</th><th>Result</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Direct settlement, 0.5 FXRP invoice</td>
+                <td>
+                  <a href="https://coston2-explorer.flare.network/tx/0x4bea1e3775332d6f289a66ced078caa400ae3b524b4097a2b41b39d22147d2b4"><code>0x4bea1e37</code></a>
+                  &middot; block 33961376 &middot; 222,790 gas
+                </td>
+              </tr>
+              <tr>
+                <td>Agent paying a $0.25 x402 invoice</td>
+                <td>
+                  <a href="https://coston2-explorer.flare.network/tx/0x975a5ac6625db3e292cd4e12c3952a3e2daa6178fd04297a1158ea3c68c336d2"><code>0x975a5ac6</code></a>
+                  &middot; block 33961951 &middot; 205,702 gas
+                </td>
+              </tr>
+              <tr>
+                <td>Direct settlement, 0.1 FXRP invoice</td>
+                <td>
+                  <a href="https://coston2-explorer.flare.network/tx/0x1e512e9675f1eb399c607dd353498710a17e77fdb2838704d7300baf4dfe515a"><code>0x1e512e96</code></a>
+                  &middot; block 33962211 &middot; 205,698 gas
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          The first payment costs about 17,000 more gas than the ones after it.
+          That is not noise: it is the payer's EIP-2612 nonce slot going from
+          zero to one, which is a cold storage write the first time and a warm
+          one forever after. The steady-state figure is the one quoted on the
+          home page.
+        </p>
+
+        <pre><code>402 payment required
+  price              $0.25
+  amount             0.244356 FTestXRP
+  XRP/USD            $1.023099
+  PASS  quoted amount matches the quoted rate
+  PASS  intent digest agrees with the facilitator
+
+signed two messages, sent no transaction
+
+200 OK
+  delivered          0.244356 FTestXRP
+  gas paid by        0xaA34e14a0e0B2fdD8Ad10F06bC0907fA0b1D02Bd
+  payer C2FLR        0 -&gt; 0
+
+  PASS  the agent paid for an API call holding no gas token at all</code></pre>
 
         <h2 id="verified">What has been verified, and how</h2>
         <p>
@@ -177,53 +246,56 @@ front-runner replays the permit directly to FXRP
 
         <h2 id="not-yet">What is not done</h2>
         <p>
-          <strong>A gasless settlement on live Coston2.</strong>
-          <code>settle.ts</code> is written and has been run against the deployed
-          facilitator on a fork, but not yet on the live chain. That needs a
-          payer wallet holding real FXRP and deliberately zero C2FLR - and that
-          zero is the whole demonstration, so it is worth doing properly rather
-          than approximating.
+          <strong>The MCP server.</strong> It does not exist. An assistant cannot
+          yet spend through this rail without the agent script being run for it.
         </p>
         <p>
-          <strong>FTSO pricing.</strong> Invoices are denominated in FXRP today.
-          Quoting in USD and converting at Flare's onchain feed is the next
-          piece, and it is what makes the oracle load-bearing rather than
-          decorative.
+          <strong>Concurrent payments from one payer.</strong> EIP-2612 nonces
+          are sequential, so an agent paying two endpoints at once will have the
+          second permit fail on a consumed nonce. EIP-3009's random nonces avoid
+          this, but FXRP does not implement EIP-3009. Payments are serialised per
+          payer until that is addressed.
         </p>
         <p>
-          <strong>The x402 service and the MCP server.</strong> Neither exists
-          yet. The home page describes the flow they will expose; it does not
-          claim they run.
+          <strong>An authenticated facilitator.</strong>
+          <code>POST /settle</code> is open, so anyone who can reach it can make
+          its relayer pay gas for a payment to any payee. Permissionless
+          settlement is the contract's design and the reason the PaymentIntent
+          exists, but a hosted facilitator would need a payee allowlist or rate
+          limiting before it faced the open internet.
+        </p>
+        <p>
+          <strong>Invoice ids across a restart.</strong> Quotes are signed with
+          <code>SCRIP_INVOICE_SECRET</code>. Without it set, the service picks a
+          random key per process, and a quote issued before a restart is rejected
+          after it.
         </p>
 
         <h2 id="roadmap">Roadmap</h2>
         <ol class="steps">
           <li>
-            <h3>Land a live gasless settlement</h3>
-            <p>
-              A payer with FXRP and zero C2FLR pays an invoice on Coston2, with
-              the transaction hash published here.
-            </p>
-          </li>
-          <li>
-            <h3>Price invoices in USD via FTSO</h3>
-            <p>
-              Read the feed onchain, convert at settlement time, and quote the
-              402 in dollars.
-            </p>
-          </li>
-          <li>
-            <h3>Ship the facilitator service and middleware</h3>
-            <p>
-              So any Flare service can charge for a request in about five lines
-              of Express.
-            </p>
-          </li>
-          <li>
             <h3>An MCP server</h3>
             <p>
               So an assistant can pay for what it uses without a human in the
-              loop.
+              loop, and without a script being run on its behalf.
+            </p>
+          </li>
+          <li>
+            <h3>Namespace invoice ids per payer</h3>
+            <p>
+              <code>settled</code> is keyed on <code>invoiceId</code> alone.
+              Invoice ids travel the HTTP path, so anyone who sees one can settle
+              their own payment against it first and burn it for the intended
+              payer. No funds are at risk - the intent still binds payer, payee
+              and amount - but the service has to reissue.
+            </p>
+          </li>
+          <li>
+            <h3>Mainnet FXRP</h3>
+            <p>
+              Everything here is Coston2. The signing path is unchanged on
+              mainnet, but the facilitator would need redeploying and auditing
+              against the real asset.
             </p>
           </li>
         </ol>
