@@ -18,6 +18,7 @@
 
 import "dotenv/config";
 import express, { type Request, type Response, type NextFunction } from "express";
+import rateLimit from "express-rate-limit";
 import { getAddress, type Address, type Hex } from "viem";
 import { Facilitator } from "../src/facilitator.js";
 import { requirePayment } from "../src/middleware.js";
@@ -35,6 +36,11 @@ function required(name: string): string {
 
 const PORT = Number(process.env.PORT ?? 8402);
 
+// Railway injects its own hostname; used only to print an honest URL at boot.
+const PUBLIC_URL = process.env.RAILWAY_PUBLIC_DOMAIN
+  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  : undefined;
+
 const facilitator = new Facilitator({
   facilitator: getAddress(required("FACILITATOR_ADDRESS")),
   relayerKey: required("RELAYER_PK") as Hex,
@@ -45,6 +51,33 @@ const payee: Address = getAddress(process.env.PAYEE_ADDRESS ?? facilitator.relay
 
 const app = express();
 app.use(express.json());
+
+// Behind Railway's proxy req.ip is the proxy unless this is set, which would put
+// every caller in one rate-limit bucket and let a single client lock out the
+// rest. One hop, not `true`: a permissive value lets a client spoof its own IP
+// through X-Forwarded-For and walk around the limiter entirely.
+if (process.env.TRUST_PROXY) app.set("trust proxy", 1);
+
+/**
+ * The relayer pays gas for anything that settles, and this service is public,
+ * so an unmetered /settle is an open invitation to drain it. The limit is loose
+ * enough that a demo never touches it and tight enough that the relayer
+ * survives being found by a bot.
+ *
+ * Only the two endpoints that cost something are limited. /health, /supported,
+ * /price and /api/haiku stay open - those are what a reader actually hits, and
+ * an unpaid /api/haiku only reads a price feed.
+ */
+const spendLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 12,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: {
+    x402Version: X402_VERSION,
+    error: "rate limited: this public facilitator caps settlement attempts per minute",
+  },
+});
 
 // --- facilitator endpoints ---------------------------------------------------
 
@@ -58,7 +91,7 @@ app.get("/supported", (_req: Request, res: Response) => {
 });
 
 /** Would this payment succeed? Costs nothing and settles nothing. */
-app.post("/verify", async (req: Request, res: Response, next: NextFunction) => {
+app.post("/verify", spendLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     res.json(await facilitator.verify(req.body?.paymentPayload ?? req.body));
   } catch (err) {
@@ -67,7 +100,7 @@ app.post("/verify", async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /** Submit the payment. The relayer signs and pays the gas. */
-app.post("/settle", async (req: Request, res: Response, next: NextFunction) => {
+app.post("/settle", spendLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await facilitator.settle(req.body?.paymentPayload ?? req.body);
     res.status(result.success ? 200 : 402).json(result);
@@ -103,6 +136,36 @@ app.get(
 
 // --- free endpoints -----------------------------------------------------------
 
+/**
+ * Someone who pastes the bare URL should learn what this is and what to try
+ * next, not read `Cannot GET /`. It is the first thing a stranger sees.
+ */
+app.get("/", (_req: Request, res: Response) => {
+  res.json({
+    service: "Scrip - machine-payable FXRP on Flare",
+    description:
+      "An x402 facilitator. Agents pay for API calls in FXRP, priced in USD at " +
+      "the live FTSO rate, holding no gas token of their own.",
+    x402Version: X402_VERSION,
+    scheme: SCHEME,
+    network: NETWORK,
+    facilitator: facilitator.address,
+    relayer: facilitator.relayer,
+    tryThis: {
+      quote: "GET /api/haiku - returns 402 with a live FTSO-priced invoice",
+      price: "GET /price - the XRP/USD feed this service bills against",
+      kinds: "GET /supported",
+    },
+    endpoints: {
+      paid: ["GET /api/haiku ($0.25)"],
+      facilitator: ["GET /supported", "POST /verify", "POST /settle"],
+      free: ["GET /health", "GET /price"],
+    },
+    source: "https://github.com/Ritapossible/Scrip",
+    site: "https://scrip-pay.vercel.app",
+  });
+});
+
 app.get("/health", (_req: Request, res: Response) => {
   res.json({ ok: true, facilitator: facilitator.address, relayer: facilitator.relayer });
 });
@@ -136,9 +199,11 @@ async function main(): Promise<void> {
   await facilitator.assertBoundToCurrentFxrp();
   const fxrp = await facilitator.fxrp();
 
-  app.listen(PORT, () => {
+  // 0.0.0.0, not loopback: a container that binds 127.0.0.1 is unreachable from
+  // outside itself, and the platform's health check sees a dead service.
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`\nScrip x402 facilitator - ${NETWORK}\n`);
-    console.log(`  listening       http://127.0.0.1:${PORT}`);
+    console.log(`  listening       ${PUBLIC_URL ?? `http://127.0.0.1:${PORT}`}`);
     console.log(`  facilitator     ${facilitator.address}`);
     console.log(`  relayer         ${facilitator.relayer}`);
     console.log(`  payee           ${payee}`);
