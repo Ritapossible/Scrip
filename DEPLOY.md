@@ -173,23 +173,49 @@ Scrip x402 facilitator - flare-coston2
   facilitator     0x43F672C0a915F59A2472a07D2108936e217cB04C
   relayer         0xaA34e14a0e0B2fdD8Ad10F06bC0907fA0b1D02Bd
   payee           0xaA34e14a0e0B2fdD8Ad10F06bC0907fA0b1D02Bd
-  asset           0x0b6A3645c240605887a5532109323A3E12273dc7 (FTestXRP, 6 decimals)
   scheme          exact-permit2612
 
   paid resource   GET /api/haiku   ($0.25)
   facilitator     GET /supported, POST /verify, POST /settle
+
+  pay it with:    npm run agent
+
+  checking the facilitator is bound to the current FXRP...
+  asset           0x0b6A3645c240605887a5532109323A3E12273dc7 (FTestXRP, 6 decimals)
+
+  ready
 ```
 
-Boot is deliberately slow and deliberately fallible. Before it listens, the
-service resolves FXRP through the registry and checks that the facilitator
-contract is bound to that same token. The facilitator's `token` is immutable, so
-one bound to a stale FXRP can never be fixed, only redeployed - and finding that
-out at startup is much better than finding it out inside a revert during a demo.
+**The port opens before any of that chain work happens**, and that ordering is
+deliberate. The service still resolves FXRP through the registry and checks that
+the facilitator contract is bound to that same token - the facilitator's `token`
+is immutable, so one bound to a stale FXRP can never be fixed, only redeployed,
+and finding that out at startup beats finding it out inside a revert during a
+demo. But the check now runs *after* the service is listening, because a health
+check can only observe whether the port answers. A process that spends a minute
+on a cold RPC before binding, and a process that died on a missing variable, look
+identical from outside: both report "healthcheck failure" and neither says which
+one happened.
 
-On a cold public RPC those calls can take tens of seconds, which is why
-`healthcheckTimeout` is 300 rather than the default. If the check is still
-failing after five minutes, the service is not slow, it is broken - read the
-logs.
+So `GET /health` reports which state it is in:
+
+| `status` | HTTP | Meaning |
+|---|---|---|
+| `checking` | 200 | Listening; the FXRP binding check has not finished. Normal for the first few seconds. |
+| `ready` | 200 | Bound to the current FXRP. Everything works. |
+| `broken` | 503 | The binding check failed. Waiting will not fix it; the `error` field says why. |
+| `misconfigured` | 503 | A variable is missing or unparseable. The `error` field names it. |
+
+A missing `RELAYER_PK` no longer kills the process. The service starts anyway and
+serves the reason on every endpoint, so a failed deploy can be diagnosed by
+curling it rather than by reading scrollback:
+
+```bash
+curl -s https://scrip-production.up.railway.app/health
+# {"ok":false,"status":"misconfigured",
+#  "error":"RELAYER_PK is not set. ... set RELAYER_PK in the service's
+#           environment variables - see DEPLOY.md."}
+```
 
 ---
 
@@ -290,10 +316,17 @@ Check the deploy status, not just the URL.
 
 ## When it does not work
 
+**Healthcheck failure is a symptom, not a cause.** Railway reports it whenever
+the port does not answer in time, whatever the underlying reason. Ask the service
+first - `curl https://<domain>/health` - because in every case except a crashed
+container it will name the problem itself.
+
 | Symptom | Cause | Fix |
 |---|---|---|
-| `RELAYER_PK is not set in .env - run npm run setup first.` | The variable is missing or is literally `0x` | Set `RELAYER_PK` in Railway variables and redeploy |
-| `facilitator is bound to 0x… but the registry resolves FXRP to 0x…` | FAsset was redeployed on Coston2; the facilitator's `token` is immutable | Redeploy `ScripFacilitator.sol` against the current token, update `FACILITATOR_ADDRESS` |
+| Healthcheck failure, `/health` says `misconfigured` | A required variable is missing or is literally `0x`. The `error` field names it. | Set it in Railway variables and redeploy |
+| Healthcheck failure, nothing served at all | The container is not running - build failure, or a crash before startup | Read the deploy logs; the build step usually says so |
+| `/health` says `broken`: `facilitator is bound to 0x… but the registry resolves FXRP to 0x…` | FAsset was redeployed on Coston2; the facilitator's `token` is immutable | Redeploy `ScripFacilitator.sol` against the current token, update `FACILITATOR_ADDRESS` |
+| `/health` stuck on `checking` for minutes | The public Coston2 RPC is cold or unreachable from the container | Usually resolves itself; a dedicated RPC endpoint fixes it permanently |
 | `tsx: not found` | `tsx` was moved to `devDependencies` | Move it back to `dependencies` |
 | Health check fails, logs stop after the boot banner | Service bound to loopback, or `PORT` set to something the domain does not target | Leave `PORT` unset; the code already binds `0.0.0.0` |
 | Deploy crashed and never came back | Hit `restartPolicyMaxRetries: 3` | Fix the cause, then redeploy manually |
