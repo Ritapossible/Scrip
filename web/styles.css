@@ -396,13 +396,19 @@ body.menu-open {
 
 /* Floating quote card - the one element that overlaps its container in the
    reference, which is what gives the composition depth. */
+/*
+ * Spans the panel, like the routing bar above it and the rows below. It used to
+ * sit at 92% with an auto left margin, which left one element inset on one side
+ * inside a panel where every other edge lines up - it read as a mistake rather
+ * than as emphasis. The text stays right-aligned: the amount is a total, and
+ * totals belong on the right.
+ */
 .quote {
   background: var(--surface);
   border-radius: var(--r-inner);
   padding: 18px 24px;
   box-shadow: var(--shadow-float);
-  margin: 22px 0 0 auto;
-  max-width: 92%;
+  margin: 22px 0 0;
   text-align: right;
 }
 
@@ -981,9 +987,6 @@ a.addr-value:hover {
   .routing {
     flex-direction: column;
     gap: 12px;
-  }
-  .quote {
-    max-width: 100%;
   }
   .steps li {
     padding: 56px 20px 20px;

@@ -207,7 +207,7 @@ client speaking the USDC dialect of x402 is turned away with a reason rather
 than a revert:
 
 ```
-$ curl -s -X POST localhost:8402/verify \
+$ curl -s -X POST https://scrip-production.up.railway.app/verify \
     -H 'content-type: application/json' \
     -d '{"x402Version":1,"scheme":"exact"}'
 
@@ -535,7 +535,7 @@ railway.json             hosting for the facilitator service - see DEPLOY.md
 
 ---
 
-## Known limitation
+## Known limitations
 
 EIP-2612 nonces are sequential per payer, so an agent paying two endpoints
 concurrently will have the second permit fail on a consumed nonce. EIP-3009's
@@ -548,25 +548,23 @@ payment against it first and burn it for the intended payer. No funds are at
 risk - the intent still binds payer, payee and amount - but the service has to
 reissue. Namespacing invoice IDs per payer would close it.
 
-`POST /settle` is unauthenticated. Anyone who can reach the facilitator can make
-its relayer pay gas for a payment to an arbitrary payee. Permissionless
-settlement is the contract's design - it is why the PaymentIntent exists at all -
-but a facilitator exposed to the open internet needs a payee allowlist or rate
-limiting on top, and this one has neither.
-
-`SCRIP_INVOICE_SECRET` should be set in any deployment that restarts. Without
-it the service generates a random key per process, so a quote issued before a
-restart is rejected after it. It warns at startup when it does this.
+`POST /settle` has no payee allowlist. Permissionless settlement is the
+contract's design - it is why the PaymentIntent exists at all - so anyone who can
+reach the hosted facilitator can make its relayer pay gas for a payment to a
+payee of their choosing. The relayer is rate limited to 12 settlement attempts a
+minute, which bounds how fast it can be drained but does not stop it. A
+facilitator holding funds worth defending needs an allowlist on top; this one is
+funded with testnet gas and deliberately expendable.
 
 ---
 
 ## Roadmap
 
 Namespace invoice IDs per payer to close the burn, give the MCP server a way to
-pay two resources at once - which today means fixing the sequential-nonce
-limitation below, not just calling `pay` twice - and take the signing path to
-mainnet FXRP, where the facilitator would need redeploying and auditing against
-the real asset.
+pay two resources at once - which means fixing the sequential-nonce limitation
+above, not just calling `pay` twice - add a payee allowlist to the hosted
+facilitator, and take the signing path to mainnet FXRP, where the facilitator
+would need redeploying and auditing against the real asset.
 
 ---
 

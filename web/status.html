@@ -339,18 +339,23 @@ front-runner replays the permit directly to FXRP
           payer until that is addressed.
         </p>
         <p>
-          <strong>An authenticated facilitator.</strong>
-          <code>POST /settle</code> is open, so anyone who can reach it can make
-          its relayer pay gas for a payment to any payee. Permissionless
+          <strong>A payee allowlist.</strong> <code>POST /settle</code> is open,
+          so anyone who can reach the hosted facilitator can make its relayer pay
+          gas for a payment to a payee of their choosing. Permissionless
           settlement is the contract's design and the reason the PaymentIntent
-          exists, but a hosted facilitator would need a payee allowlist or rate
-          limiting before it faced the open internet.
+          exists at all. The relayer is rate limited to twelve settlement
+          attempts a minute, which bounds how fast it can be drained without
+          stopping it. A facilitator holding funds worth defending would need an
+          allowlist; this one is funded with testnet gas and is deliberately
+          expendable.
         </p>
         <p>
-          <strong>Invoice ids across a restart.</strong> Quotes are signed with
-          <code>SCRIP_INVOICE_SECRET</code>. Without it set, the service picks a
-          random key per process, and a quote issued before a restart is rejected
-          after it.
+          <strong>Invoice ids are not namespaced per payer.</strong>
+          <code>settled</code> is keyed on the invoice id alone, and invoice ids
+          travel the HTTP path - so anyone who sees one can settle their own
+          payment against it first and burn it for the payer it was issued to. No
+          funds are at risk, because the intent still binds payer, payee and
+          amount, but the service has to reissue the quote.
         </p>
 
         <h2 id="roadmap">Roadmap</h2>
@@ -366,11 +371,17 @@ front-runner replays the permit directly to FXRP
           <li>
             <h3>Namespace invoice ids per payer</h3>
             <p>
-              <code>settled</code> is keyed on <code>invoiceId</code> alone.
-              Invoice ids travel the HTTP path, so anyone who sees one can settle
-              their own payment against it first and burn it for the intended
-              payer. No funds are at risk - the intent still binds payer, payee
-              and amount - but the service has to reissue.
+              Keying <code>settled</code> on the payer as well as the invoice id
+              closes the burn described above, and costs nothing but a mapping
+              key.
+            </p>
+          </li>
+          <li>
+            <h3>A payee allowlist on the hosted facilitator</h3>
+            <p>
+              Rate limiting bounds how fast the relayer can be drained. An
+              allowlist is what stops it, and is the thing to add before a
+              facilitator holds anything worth taking.
             </p>
           </li>
           <li>
