@@ -110,7 +110,7 @@ Railway → your service → **Variables**. These are the whole configuration.
 | `TRUST_PROXY` | `1` | **Yes, on Railway** |
 | `RPC_URL` | `https://coston2-api.flare.network/ext/C/rpc` | Optional, this is the default |
 | `PAYEE_ADDRESS` | `0x…` where payments land. Defaults to the relayer. | Optional |
-| `PORT` | Leave unset. | Optional |
+| `PORT` | `8402`, and set the domain's target port to match | **Yes** |
 
 Four of these have consequences worth stating plainly.
 
@@ -143,11 +143,19 @@ out everyone else. It is `1` and not `true` on purpose: a permissive value lets 
 client put whatever it likes in `X-Forwarded-For` and walk around the limiter
 entirely. Leave it unset when running locally, where nothing sets the header.
 
-**Leave `PORT` alone.** Railway injects it, and the service already reads
-`process.env.PORT` and binds `0.0.0.0` rather than loopback - a container bound to
-`127.0.0.1` is unreachable from outside itself and the health check sees a dead
-service. If you do set `PORT` explicitly, the generated domain's target port must
-match it, or Railway routes to a port nothing is listening on.
+**Set `PORT` explicitly, and make the domain target the same number.** The
+service reads `process.env.PORT` and falls back to 8402, and it binds `0.0.0.0`
+rather than loopback - a container bound to `127.0.0.1` is unreachable from
+outside itself and the health check sees a dead service.
+
+Leaving `PORT` unset relies on two things agreeing that you have not checked: that
+the platform injects one, and that its health check probes the same number it
+injected. When they disagree the failure is silent and total - the process is
+healthy, listening, and answering, and every health check attempt still reports
+`service unavailable`, because nothing is knocking on the port the service opened.
+Nothing in the logs says so, because from the application's side nothing is wrong.
+Setting both ends to the same number costs one variable and removes the entire
+class of problem.
 
 ---
 
@@ -328,7 +336,8 @@ container it will name the problem itself.
 | `/health` says `broken`: `facilitator is bound to 0x… but the registry resolves FXRP to 0x…` | FAsset was redeployed on Coston2; the facilitator's `token` is immutable | Redeploy `ScripFacilitator.sol` against the current token, update `FACILITATOR_ADDRESS` |
 | `/health` stuck on `checking` for minutes | The public Coston2 RPC is cold or unreachable from the container | Usually resolves itself; a dedicated RPC endpoint fixes it permanently |
 | `tsx: not found` | `tsx` was moved to `devDependencies` | Move it back to `dependencies` |
-| Health check fails, logs stop after the boot banner | Service bound to loopback, or `PORT` set to something the domain does not target | Leave `PORT` unset; the code already binds `0.0.0.0` |
+| Health check fails, but the deploy logs show the normal boot banner and `listening` | The service is up and the health check is probing a different port | Set `PORT=8402` and make the domain's target port 8402 as well |
+| Health check fails, deploy logs are empty | The process never started - almost always an older build, from before startup was made to survive a bad variable | Redeploy from the latest commit on `main` |
 | Deploy crashed and never came back | Hit `restartPolicyMaxRetries: 3` | Fix the cause, then redeploy manually |
 | `/api/haiku` 500s with an FTSO message | `FTSO feed is …s old` - the feed stalled, and billing against a stalled feed is worse than refusing to bill | Wait; it is a Coston2 condition, not a bug |
 | Everything 429s | One client is filling the shared rate-limit bucket | Confirm `TRUST_PROXY=1` is set - without it every caller shares one bucket |
