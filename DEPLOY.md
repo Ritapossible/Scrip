@@ -110,7 +110,7 @@ Railway → your service → **Variables**. These are the whole configuration.
 | `TRUST_PROXY` | `1` | **Yes, on Railway** |
 | `RPC_URL` | `https://coston2-api.flare.network/ext/C/rpc` | Optional, this is the default |
 | `PAYEE_ADDRESS` | `0x…` where payments land. Defaults to the relayer. | Optional |
-| `PORT` | `8402`, and set the domain's target port to match | **Yes** |
+| `PORT` | Leave unset - Railway injects one | Optional |
 
 Four of these have consequences worth stating plainly.
 
@@ -143,19 +143,16 @@ out everyone else. It is `1` and not `true` on purpose: a permissive value lets 
 client put whatever it likes in `X-Forwarded-For` and walk around the limiter
 entirely. Leave it unset when running locally, where nothing sets the header.
 
-**Set `PORT` explicitly, and make the domain target the same number.** The
-service reads `process.env.PORT` and falls back to 8402, and it binds `0.0.0.0`
-rather than loopback - a container bound to `127.0.0.1` is unreachable from
-outside itself and the health check sees a dead service.
+**Leave `PORT` unset.** Railway injects one - 8080 in observed deployments - and
+the service reads `process.env.PORT`, falling back to 8402 only when nothing sets
+it. It also binds `0.0.0.0` rather than loopback, because a container bound to
+`127.0.0.1` is unreachable from outside itself and the health check sees a dead
+service.
 
-Leaving `PORT` unset relies on two things agreeing that you have not checked: that
-the platform injects one, and that its health check probes the same number it
-injected. When they disagree the failure is silent and total - the process is
-healthy, listening, and answering, and every health check attempt still reports
-`service unavailable`, because nothing is knocking on the port the service opened.
-Nothing in the logs says so, because from the application's side nothing is wrong.
-Setting both ends to the same number costs one variable and removes the entire
-class of problem.
+Setting `PORT` yourself overrides what Railway injected, and then the platform's
+health check and the listening socket can disagree about which number to use. If
+you do set it, the domain's target port under **Settings → Networking** has to
+match it.
 
 ---
 
@@ -324,14 +321,24 @@ Check the deploy status, not just the URL.
 
 ## When it does not work
 
-**Healthcheck failure is a symptom, not a cause.** Railway reports it whenever
-the port does not answer in time, whatever the underlying reason. Ask the service
-first - `curl https://<domain>/health` - because in every case except a crashed
-container it will name the problem itself.
+**Healthcheck failure is a symptom, not a cause,** and the build log is the wrong
+place to look for the cause. Railway keeps them in separate panes: the build log
+ends at `image push` and then shows health check attempts, while everything the
+application prints - including the sentence naming what is wrong - is in **Deploy
+Logs**. A build that succeeds and a deploy that never works look identical until
+you switch panes.
+
+Note also that a misconfigured service *should* fail its health check. `/health`
+answers 503 when a variable is missing or malformed, and Railway reports any 503
+as `service unavailable`. That is the intended outcome - a service that cannot
+settle a payment is not healthy - but it means "healthcheck failure" and "one
+variable has a typo" produce the same line in the build log. Read the deploy log,
+or ask the service: `curl https://<domain>/health` returns the reason as JSON.
 
 | Symptom | Cause | Fix |
 |---|---|---|
 | Healthcheck failure, `/health` says `misconfigured` | A required variable is missing or is literally `0x`. The `error` field names it. | Set it in Railway variables and redeploy |
+| `RELAYER_PK is not a valid private key … got 66` | The value picked up wrapping quotes, a space or a newline. Quotes, whitespace and a missing `0x` are stripped automatically, so a length that is not 64 means the paste itself is wrong | Re-copy the key from `.env`, without the `RELAYER_PK=` prefix and without quotes |
 | Healthcheck failure, nothing served at all | The container is not running - build failure, or a crash before startup | Read the deploy logs; the build step usually says so |
 | `/health` says `broken`: `facilitator is bound to 0x… but the registry resolves FXRP to 0x…` | FAsset was redeployed on Coston2; the facilitator's `token` is immutable | Redeploy `ScripFacilitator.sol` against the current token, update `FACILITATOR_ADDRESS` |
 | `/health` stuck on `checking` for minutes | The public Coston2 RPC is cold or unreachable from the container | Usually resolves itself; a dedicated RPC endpoint fixes it permanently |

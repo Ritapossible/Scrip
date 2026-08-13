@@ -44,6 +44,35 @@ function required(name: string): string {
   return value;
 }
 
+/**
+ * Read a private key from the environment, forgiving the things a value picks up
+ * on its way through a hosting dashboard and naming the things it cannot.
+ *
+ * viem answers a wrapping quote, a trailing newline, a missing 0x and a
+ * truncated paste with one sentence - "invalid private key, expected hex or 32
+ * bytes, got string" - which is true of all four and useful for none. Three of
+ * them are recoverable without guessing at intent, so they are recovered; what
+ * is left is reported with the detail needed to fix it, and without putting any
+ * part of the key in a log.
+ */
+function requiredKey(name: string): Hex {
+  const raw = required(name)
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .trim();
+
+  const body = raw.startsWith("0x") || raw.startsWith("0X") ? raw.slice(2) : raw;
+  if (!/^[0-9a-fA-F]{64}$/.test(body)) {
+    throw new Error(
+      `${name} is not a valid private key. Expected 64 hexadecimal characters, ` +
+        `optionally 0x-prefixed; got ${body.length}. Check the variable for ` +
+        `wrapping quotes, a trailing space or newline, or a paste that lost ` +
+        `characters at either end.`,
+    );
+  }
+  return `0x${body.toLowerCase()}` as Hex;
+}
+
 const PORT = Number(process.env.PORT ?? 8402);
 
 // Railway injects its own hostname; used only to print an honest URL at boot.
@@ -281,7 +310,7 @@ async function main(): Promise<void> {
   try {
     facilitator = new Facilitator({
       facilitator: getAddress(required("FACILITATOR_ADDRESS")),
-      relayerKey: required("RELAYER_PK") as Hex,
+      relayerKey: requiredKey("RELAYER_PK"),
       rpcUrl: process.env.RPC_URL,
     });
     const payee: Address = getAddress(process.env.PAYEE_ADDRESS ?? facilitator.relayer);
