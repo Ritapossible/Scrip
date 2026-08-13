@@ -62,12 +62,12 @@
         </nav>
 
         <div class="menu" id="site-menu" data-menu aria-hidden="true">
+          <a href="./">Home <span class="hint">what this is</span></a>
           <a href="./how-it-works">How it works <span class="hint">two signatures</span></a>
           <a href="./contract">Contract <span class="hint">deployed + verified</span></a>
           <a href="./status" aria-current="page">Status <span class="hint">what runs today</span></a>
           <a href="./docs">Docs <span class="hint">run it yourself</span></a>
           <div class="menu-sep"></div>
-          <a href="./">Home</a>
           <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
           <a class="menu-cta" href="./docs#quickstart">Get Started</a>
         </div>
@@ -144,10 +144,52 @@ curl https://scrip-production.up.railway.app/price
 curl -i https://scrip-production.up.railway.app/api/haiku</code></pre>
 
         <p>
-          The last one answers <code>402</code> with a price in USD, the FXRP it
-          converts to, the FTSO rate it was derived from, and a single-use
-          invoice id - priced at the moment you ask.
+          The last one answers <code>402 Payment Required</code> with a price in
+          USD, the FXRP it converts to, the FTSO rate it was derived from, and a
+          single-use invoice id - priced at the moment you ask, and payable for
+          ten minutes.
         </p>
+
+        <p>
+          <a href="https://scrip-production.up.railway.app/api/haiku">Open that
+          endpoint in a browser</a> and you get the raw JSON body, which looks
+          like an error page and is not one. A <code>402</code> is the server
+          quoting a price rather than refusing to answer: the terms are the
+          response. It reads better through <code>curl -i</code>, where the
+          status line is visible above the body:
+        </p>
+
+        <pre><code>HTTP/2 402
+content-type: application/json
+
+{
+  "x402Version": 1,
+  "error": "payment required: $0.25 in FXRP (0.247794 FTestXRP at $1.008904/XRP)",
+  "accepts": [{
+    "scheme": "exact-permit2612",
+    "maxAmountRequired": "247794",
+    "priceUsd": "0.25",
+    "rate": { "feedId": "0x0158...", "value": "1008904", "decimals": 6 },
+    "payTo": "0xaA34e14a0e0B2fdD8Ad10F06bC0907fA0b1D02Bd",
+    "asset": "0x0b6A3645c240605887a5532109323A3E12273dc7",
+    "invoiceId": "0x98913e13...",
+    "deadline": "1786655791"
+  }]
+}</code></pre>
+
+        <p>
+          Everything needed to pay is in there, and the <code>rate</code> is
+          included so a client can recompute the FXRP amount from the USD price
+          and refuse if the two disagree. The agent in this repository does
+          exactly that before it signs anything.
+        </p>
+
+        <p>
+          To pay one, clone the repository and point the agent at the hosted
+          endpoint:
+        </p>
+
+        <pre><code>npm run agent -- https://scrip-production.up.railway.app/api/haiku</code></pre>
 
         <h2 id="live">The payments that actually happened</h2>
         <p>
