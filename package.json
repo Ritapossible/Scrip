@@ -16,6 +16,7 @@
     "settle": "tsx scripts/settle.ts",
     "serve:x402": "tsx scripts/serve-x402.ts",
     "agent": "tsx scripts/agent.ts",
+    "mcp": "tsx scripts/mcp.ts",
     "web": "node scripts/serve-web.mjs",
     "typecheck": "tsc --noEmit",
     "test:fork": "node scripts/settle-fork-test.mjs"
@@ -31,11 +32,13 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "dotenv": "^16.4.7",
     "express": "^4.22.2",
     "express-rate-limit": "^8.6.2",
     "tsx": "^4.19.2",
-    "viem": "^2.21.0"
+    "viem": "^2.21.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/express": "^4.17.25",

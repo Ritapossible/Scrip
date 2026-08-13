@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "scrip": {
+      "command": "npm",
+      "args": ["run", "mcp"]
+    }
+  }
+}

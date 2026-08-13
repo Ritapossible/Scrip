@@ -13,6 +13,7 @@ What is being deployed, and what is not:
 | Marketing / docs site (`web/`) | Vercel, static, no build step (`vercel.json`) |
 | `ScripFacilitator.sol` | Already deployed on Coston2 at `0x43F672C0a915F59A2472a07D2108936e217cB04C` |
 | `probe`, `price`, `settle`, `agent`, `test:fork` | Your machine |
+| MCP server (`npm run mcp`) | Your machine - it speaks stdio to a local client and holds the payer key, so it is deliberately not hosted |
 
 The contract is already on chain and does not get deployed again. Railway hosts
 the HTTP service in front of it.

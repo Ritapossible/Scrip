@@ -25,10 +25,11 @@ live Coston2.
 | FTSO USD pricing | **working, live Coston2** - invoices priced at the live XRP/USD feed |
 | x402 facilitator service + Express middleware | **working, live Coston2** |
 | An agent paying a 402 holding no gas token | **working, live Coston2** - [tx `0x975a5ac6`][tx2] |
-| MCP server so an assistant can spend | not built |
+| MCP server - an assistant prices, quotes and pays in conversation | **working, live Coston2** - [tx `0xeeef2e1d`][tx3] |
 
 [tx1]: https://coston2-explorer.flare.network/tx/0x4bea1e3775332d6f289a66ced078caa400ae3b524b4097a2b41b39d22147d2b4
 [tx2]: https://coston2-explorer.flare.network/tx/0x975a5ac6625db3e292cd4e12c3952a3e2daa6178fd04297a1158ea3c68c336d2
+[tx3]: https://coston2-explorer.flare.network/tx/0xeeef2e1d32468fc71d44695a1995745af0a4b53e2a228c9a66dfe14b8cd6b46d
 
 ---
 
@@ -191,6 +192,78 @@ got nothing.
 
 ---
 
+## An assistant that can spend
+
+`npm run mcp` starts an MCP server over stdio. Everything else in this repo is an
+agent that was told what to buy; this is the piece that lets an assistant decide -
+ask what a resource costs, say so, and pay for it inside a conversation.
+
+Point a client at it. For Claude Code, `.mcp.json` in the project root:
+
+```json
+{
+  "mcpServers": {
+    "scrip": {
+      "command": "npm",
+      "args": ["run", "mcp"],
+      "cwd": "/absolute/path/to/Scrip"
+    }
+  }
+}
+```
+
+Five tools. Four of them cannot spend anything:
+
+| Tool | Does |
+|---|---|
+| `price` | What is $X in FXRP right now, at the live FTSO feed |
+| `quote` | Fetch a paid URL, report the price and the checks, pay nothing |
+| `wallet` | Payer address, FXRP balance, C2FLR balance, budget left |
+| `facilitator` | Is this facilitator reachable, and does it speak our scheme |
+| `pay` | **Spends FXRP.** Pays a 402 and returns the resource and the receipt |
+
+A conversation looks like this:
+
+```
+> what does the haiku endpoint cost?
+
+  quote → $0.25 = 0.248544 FTestXRP at $1.005861/XRP
+          PASS  asset is the registry's FXRP
+          PASS  quoted amount matches the quoted rate
+
+> go ahead
+
+  pay   → 200, haiku delivered
+          tx           0xeeef2e1d…  block 34018086
+          delivered    0.248429 FTestXRP
+          gas paid by  0xaA34e14a…
+          payer C2FLR  0 -> 0
+          spent        $0.25 of $5.00 this session
+```
+
+**Handing a language model a spending key deserves more than a tool definition.**
+Two limits sit in front of `pay`, and neither can be raised by anything the model
+or the resource server says:
+
+- `SCRIP_MAX_USD_PER_CALL` (default `$1.00`), checked against the quote's USD
+  price before a signature exists. A `maxUsd` argument can lower it for one call
+  and can never raise it.
+- `SCRIP_MAX_USD_SESSION` (default `$5.00`), accumulated across every payment the
+  process makes and not resettable without restarting it.
+
+They are enforced in the client, because a cap the server sets is not a cap. The
+payer's FXRP balance is the third and hardest limit: it holds no gas token, so
+the worst case for a key that leaks is the FXRP sitting in it.
+
+Without `PAYER_PK` the server still starts and still prices, quotes and inspects
+facilitators. Refusing to run without a spending key would trade all of that away
+for nothing.
+
+The payment path itself is `src/pay.ts`, shared with `scripts/agent.ts` - a
+payment path that exists twice is one where only one copy gets fixed.
+
+---
+
 ## What the fork test proves
 
 `npm run test:fork` forks live Coston2, deploys the facilitator onto the fork,
@@ -244,6 +317,7 @@ after:
 |---|---|---|---|
 | 0.5 FXRP, direct | 33961376 | 222,790 | [`0x4bea1e37`][tx1] |
 | $0.25 via x402 | 33961951 | 205,702 | [`0x975a5ac6`][tx2] |
+| $0.25 via the MCP `pay` tool | 34018086 | 205,698 | [`0xeeef2e1d`][tx3] |
 
 [fac]: https://coston2-explorer.flare.network/address/0x43F672C0a915F59A2472a07D2108936e217cB04C
 
@@ -311,6 +385,12 @@ and in another:
 npm run agent            # gets a 402, pays it, gets the resource
 ```
 
+Or hand the rail to an assistant instead of a script:
+
+```bash
+npm run mcp              # MCP server over stdio - see "An assistant that can spend"
+```
+
 It resolves FXRP through the registry, checks its locally built EIP-712 digest
 against the facilitator's own `intentDigest()` before signing anything, and
 refuses to run if the payer is short, the relayer has no gas, or the invoice was
@@ -342,6 +422,7 @@ src/
   x402.ts                the wire format: 402 body, X-PAYMENT, X-PAYMENT-RESPONSE
   facilitator.ts         verify() and settle() against the chain
   middleware.ts          requirePayment() - charge for an Express route
+  pay.ts                 the client side: quote, check, sign, pay
 scripts/
   probe.ts               read-only: resolve FXRP, verify the signing domain
   price.ts               read-only: what is $X in FXRP right now?
@@ -350,6 +431,7 @@ scripts/
   settle.ts              signs and settles one invoice, gaslessly
   serve-x402.ts          the facilitator service + a paid endpoint
   agent.ts               an agent that pays a 402 holding no gas token
+  mcp.ts                 MCP server - an assistant that can spend, with caps
   settle-fork-test.mjs   settles a real invoice against a fork of live Coston2
   serve-web.mjs          local server matching production URL rules
 web/
@@ -361,6 +443,7 @@ web/
   app.js                 site menu
   styles.css             design system
 vercel.json              static hosting, no build step
+railway.json             hosting for the facilitator service - see DEPLOY.md
 ```
 
 ---
@@ -392,10 +475,11 @@ restart is rejected after it. It warns at startup when it does this.
 
 ## Roadmap
 
-Ship an MCP server so an assistant can spend through the rail directly, namespace
-invoice IDs per payer to close the burn, and take the signing path to mainnet
-FXRP - where the facilitator would need redeploying and auditing against the real
-asset.
+Namespace invoice IDs per payer to close the burn, give the MCP server a way to
+pay two resources at once - which today means fixing the sequential-nonce
+limitation below, not just calling `pay` twice - and take the signing path to
+mainnet FXRP, where the facilitator would need redeploying and auditing against
+the real asset.
 
 ---
 
