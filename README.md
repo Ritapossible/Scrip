@@ -316,6 +316,10 @@ against the facilitator's own `intentDigest()` before signing anything, and
 refuses to run if the payer is short, the relayer has no gas, or the invoice was
 already settled.
 
+To put the facilitator on the public internet rather than on localhost, see
+[DEPLOY.md](DEPLOY.md) - it covers hosting the service on Railway, the variables
+it needs, and why the relayer key means replicas have to stay at one.
+
 Two environment notes that cost time otherwise: the public Coston2 RPC times out
 on a cold call well past viem's 10 second default, so the transport here is set
 to 45 seconds with retries. And Windows PowerShell 5.1 negotiates TLS 1.0 by
