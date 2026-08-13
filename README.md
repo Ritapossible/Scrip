@@ -480,6 +480,9 @@ against the facilitator's own `intentDigest()` before signing anything, and
 refuses to run if the payer is short, the relayer has no gas, or the invoice was
 already settled.
 
+There is a recording script in [DEMO.md](DEMO.md) if you are filming this rather
+than running it.
+
 To put the facilitator on the public internet rather than on localhost, see
 [DEPLOY.md](DEPLOY.md) - it covers hosting the service on Railway, the variables
 it needs, and why the relayer key means replicas have to stay at one.
