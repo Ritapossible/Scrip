@@ -9,9 +9,25 @@
       content="What is actually running in Scrip, what has been verified and how, and what is not built yet. Nothing on this page is aspirational."
     />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href="https://scrip-pay.vercel.app/status" />
+    <meta name="theme-color" content="#f6f4ec" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Status - Scrip" />
+    <meta property="og:description" content="What is actually running in Scrip, what has been verified and how, and what is not built yet. Nothing on this page is aspirational." />
+    <meta property="og:site_name" content="Scrip" />
+    <meta property="og:url" content="https://scrip-pay.vercel.app/status" />
+    <meta property="og:image" content="https://scrip-pay.vercel.app/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Scrip - machine-payable FXRP. Agents pay per call, priced in USD by FTSO and settled on Flare." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Status - Scrip" />
+    <meta name="twitter:description" content="What is actually running in Scrip, what has been verified and how, and what is not built yet. Nothing on this page is aspirational." />
+    <meta name="twitter:image" content="https://scrip-pay.vercel.app/og.png" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <div class="shell">
       <div class="nav-wrap">
         <nav class="nav">
@@ -68,7 +84,7 @@
         </p>
       </header>
 
-      <main class="doc">
+      <main class="doc" id="main">
         <h2 id="table">The state of each piece</h2>
         <div class="table-wrap">
           <table>
@@ -109,8 +125,8 @@
                 <td><span class="pill">runs locally, settles on live Coston2</span></td>
               </tr>
               <tr>
-                <td>MCP server so an assistant can spend</td>
-                <td><span class="pill pending">not built</span></td>
+                <td>MCP server - an assistant prices, quotes and pays in conversation</td>
+                <td><span class="pill">runs locally, settles on live Coston2</span></td>
               </tr>
             </tbody>
           </table>
@@ -151,6 +167,13 @@
                 <td>
                   <a href="https://coston2-explorer.flare.network/tx/0x1e512e9675f1eb399c607dd353498710a17e77fdb2838704d7300baf4dfe515a"><code>0x1e512e96</code></a>
                   &middot; block 33962211 &middot; 205,698 gas
+                </td>
+              </tr>
+              <tr>
+                <td>An assistant paying $0.25 through the MCP <code>pay</code> tool</td>
+                <td>
+                  <a href="https://coston2-explorer.flare.network/tx/0xeeef2e1d32468fc71d44695a1995745af0a4b53e2a228c9a66dfe14b8cd6b46d"><code>0xeeef2e1d</code></a>
+                  &middot; block 34018086 &middot; 205,698 gas
                 </td>
               </tr>
             </tbody>
@@ -246,10 +269,6 @@ front-runner replays the permit directly to FXRP
 
         <h2 id="not-yet">What is not done</h2>
         <p>
-          <strong>The MCP server.</strong> It does not exist. An assistant cannot
-          yet spend through this rail without the agent script being run for it.
-        </p>
-        <p>
           <strong>Concurrent payments from one payer.</strong> EIP-2612 nonces
           are sequential, so an agent paying two endpoints at once will have the
           second permit fail on a consumed nonce. EIP-3009's random nonces avoid
@@ -274,10 +293,11 @@ front-runner replays the permit directly to FXRP
         <h2 id="roadmap">Roadmap</h2>
         <ol class="steps">
           <li>
-            <h3>An MCP server</h3>
+            <h3>Concurrent payments from one assistant</h3>
             <p>
-              So an assistant can pay for what it uses without a human in the
-              loop, and without a script being run on its behalf.
+              The MCP server can pay for one resource at a time. Paying for two
+              at once means fixing the sequential-nonce limitation above, not
+              just calling the tool twice.
             </p>
           </li>
           <li>

@@ -21,6 +21,11 @@ const TYPES = {
   ".js": "text/javascript; charset=utf-8",
   ".svg": "image/svg+xml",
   ".json": "application/json; charset=utf-8",
+  // Served as octet-stream otherwise, which means the social card cannot be
+  // previewed locally and robots.txt downloads instead of opening.
+  ".png": "image/png",
+  ".txt": "text/plain; charset=utf-8",
+  ".xml": "application/xml; charset=utf-8",
 };
 
 async function resolve(pathname) {
@@ -49,8 +54,20 @@ const server = createServer(async (req, res) => {
   const file = await resolve(pathname);
 
   if (!file) {
-    res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
-    res.end(`404 ${pathname}`);
+    // Vercel serves web/404.html for an unknown path, so serving a line of
+    // plain text here would hide the one page you cannot reach by clicking.
+    // Falls back to text only if the file is missing.
+    try {
+      const notFound = await readFile(join(ROOT, "404.html"));
+      res.writeHead(404, {
+        "content-type": TYPES[".html"],
+        "cache-control": "no-store",
+      });
+      res.end(notFound);
+    } catch {
+      res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+      res.end(`404 ${pathname}`);
+    }
     return;
   }
 

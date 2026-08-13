@@ -1,0 +1,153 @@
+<!doctype html>
+<!--
+  Source for web/og.png - the card that shows when a Scrip link is pasted into
+  Discord, Slack, X or a hackathon submission page. It is HTML rather than a
+  hand-drawn PNG so it stays editable and stays on the design system.
+
+  Regenerate after editing:
+
+    chrome --headless --disable-gpu --hide-scrollbars \
+      --force-device-scale-factor=2 --window-size=1200,630 \
+      --screenshot=web/og.png scripts/og-card.html
+
+  On Windows, chrome is usually
+  "C:\Program Files\Google\Chrome\Application\chrome.exe".
+
+  Keep it at 1200x630: that is the ratio every platform crops toward, and the
+  safe area is roughly the middle 90%.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @page { size: 1200px 630px; margin: 0; }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      html, body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+      }
+
+      body {
+        background-color: #f6f4ec;
+        background-image: radial-gradient(rgba(7, 42, 26, 0.08) 2px, transparent 2px);
+        background-size: 30px 30px;
+        color: #072a1a;
+        font-family: "Segoe UI", ui-sans-serif, system-ui, -apple-system, Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 68px 76px;
+        position: relative;
+      }
+
+      /* A soft brand wash in the corner, so the card is not a flat rectangle. */
+      body::after {
+        content: "";
+        position: absolute;
+        right: -180px;
+        top: -220px;
+        width: 620px;
+        height: 620px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at center,
+          rgba(52, 226, 155, 0.28),
+          rgba(52, 226, 155, 0) 70%
+        );
+      }
+
+      .mark {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        font-size: 30px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+      }
+
+      h1 {
+        font-size: 92px;
+        line-height: 1.02;
+        letter-spacing: -0.035em;
+        font-weight: 700;
+        max-width: 17ch;
+      }
+
+      h1 .accent { color: #0b7a4b; }
+
+      .sub {
+        margin-top: 26px;
+        font-size: 32px;
+        line-height: 1.42;
+        color: #4a6659;
+        max-width: 44ch;
+      }
+
+      .strip {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: #ffffff;
+        border: 1px solid rgba(7, 42, 26, 0.1);
+        border-radius: 999px;
+        padding: 13px 24px;
+        font-size: 23px;
+        font-weight: 600;
+        color: #072a1a;
+        box-shadow: 0 1px 2px rgba(7, 42, 26, 0.04),
+          0 12px 32px rgba(7, 42, 26, 0.06);
+      }
+
+      .chip .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #0fa968;
+      }
+
+      .url {
+        margin-left: auto;
+        font-size: 23px;
+        color: #86998f;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mark">
+      <svg width="46" height="46" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="5" r="3" fill="#0FA968" />
+        <circle cx="12" cy="12" r="3.6" fill="#0B7A4B" />
+        <circle cx="12" cy="19" r="3" fill="#34E29B" />
+      </svg>
+      SCRIP
+    </div>
+
+    <div>
+      <h1>Machine-payable <span class="accent">FXRP</span></h1>
+      <p class="sub">
+        Agents pay per call, priced in USD by FTSO and settled on Flare -
+        holding no gas token at all.
+      </p>
+    </div>
+
+    <div class="strip">
+      <span class="chip"><span class="dot"></span>Deployed on Coston2</span>
+      <span class="chip">x402</span>
+      <span class="chip">EIP-2612 permit</span>
+      <span class="url">scrip-pay.vercel.app</span>
+    </div>
+  </body>
+</html>

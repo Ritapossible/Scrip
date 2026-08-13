@@ -15,9 +15,22 @@
       property="og:description"
       content="Agents pay per call in FXRP on Flare. The payer signs offchain and holds no gas token; a relayer pays the fee."
     />
+    <link rel="canonical" href="https://scrip-pay.vercel.app/" />
+    <meta name="theme-color" content="#f6f4ec" />
+    <meta property="og:site_name" content="Scrip" />
+    <meta property="og:url" content="https://scrip-pay.vercel.app/" />
+    <meta property="og:image" content="https://scrip-pay.vercel.app/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Scrip - machine-payable FXRP. Agents pay per call, priced in USD by FTSO and settled on Flare." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Scrip - machine-payable FXRP" />
+    <meta name="twitter:description" content="Scrip is a payment rail that makes bridged XRP spendable by software. Agents pay per call in FXRP, priced in USD by Flare's FTSO, with no gas token." />
+    <meta name="twitter:image" content="https://scrip-pay.vercel.app/og.png" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <div class="shell">
       <div class="nav-wrap">
         <nav class="nav">
@@ -142,7 +155,7 @@
         </div>
       </section>
 
-      <main>
+      <main id="main">
         <section class="page-head" style="padding-top: 76px">
           <p class="eyebrow">Why Flare specifically</p>
           <h2>It does not port by find-and-replace</h2>
@@ -200,6 +213,61 @@
             <div class="stat-value">2</div>
             <div class="stat-label">Signatures per payment</div>
           </div>
+        </div>
+
+        <section class="page-head" style="padding-top: 76px">
+          <p class="eyebrow">New</p>
+          <h2>An assistant that can spend</h2>
+          <p class="lede">
+            An MCP server puts the rail inside a conversation. An assistant can
+            ask what a resource costs, say so in plain language, and pay for it -
+            holding FXRP and no gas token, like every other payer here.
+          </p>
+        </section>
+
+        <div class="cards">
+          <div class="card">
+            <div class="card-mark">1</div>
+            <h3>Four tools that cannot spend</h3>
+            <p>
+              <code>price</code>, <code>quote</code>, <code>wallet</code> and
+              <code>facilitator</code> only read. A price can always be checked
+              before a single signature exists.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card-mark">2</div>
+            <h3>One that can</h3>
+            <p>
+              <code>pay</code> settles a 402 and returns the resource with the
+              transaction that paid for it. It is the only tool that moves money,
+              and it is the reason for the two limits beside it.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card-mark">3</div>
+            <h3>Caps the model cannot raise</h3>
+            <p>
+              A per-call ceiling and a session budget, both checked against the
+              quote's USD price. A tool argument can lower them for one call and
+              never lift them.
+            </p>
+          </div>
+        </div>
+
+        <div class="callout">
+          <span class="callout-title">
+            Handing a language model a spending key deserves more than a tool
+            definition.
+          </span>
+          <p>
+            The caps are enforced in the client, because a cap the server sets is
+            not a cap. The payer's own balance is the hardest limit of the three:
+            it holds no gas token, so the worst case for a key that leaks is the
+            FXRP sitting in it. The
+            <a href="./status">status page</a> lists the payment an assistant
+            actually made.
+          </p>
         </div>
 
         <div class="callout">

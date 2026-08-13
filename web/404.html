@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Page not found - Scrip</title>
+    <meta name="description" content="That page does not exist on scrip-pay.vercel.app." />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#f6f4ec" />
+    <!--
+      Every path here is root-absolute, unlike the rest of the site. A 404 is
+      served for a URL that does not exist, and "./docs" from /some/bad/path
+      resolves to /some/bad/docs - so a relative link on this page would send a
+      lost reader somewhere equally lost.
+    -->
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="shell">
+      <div class="nav-wrap">
+        <nav class="nav">
+          <button
+            class="nav-toggle"
+            type="button"
+            data-menu-toggle
+            aria-expanded="false"
+            aria-controls="site-menu"
+            aria-label="Open menu"
+          >
+            <span></span><span></span><span></span>
+          </button>
+
+          <a class="nav-mark" href="/">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="5" r="3" fill="#0FA968" />
+              <circle cx="12" cy="12" r="3.6" fill="#0B7A4B" />
+              <circle cx="12" cy="19" r="3" fill="#34E29B" />
+            </svg>
+            SCRIP
+          </a>
+
+          <div class="nav-links">
+            <a href="/how-it-works">How it works</a>
+            <a href="/contract">Contract</a>
+            <a href="/status">Status</a>
+            <a href="/docs">Docs</a>
+            <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
+            <a class="nav-cta" href="/docs#quickstart">Get Started</a>
+          </div>
+        </nav>
+
+        <div class="menu" id="site-menu" data-menu aria-hidden="true">
+          <a href="/how-it-works">How it works <span class="hint">two signatures</span></a>
+          <a href="/contract">Contract <span class="hint">deployed + verified</span></a>
+          <a href="/status">Status <span class="hint">what runs today</span></a>
+          <a href="/docs">Docs <span class="hint">run it yourself</span></a>
+          <div class="menu-sep"></div>
+          <a href="/">Home</a>
+          <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
+          <a class="menu-cta" href="/docs#quickstart">Get Started</a>
+        </div>
+      </div>
+      <div class="menu-scrim" data-menu-scrim></div>
+
+      <main id="main">
+        <header class="page-head">
+          <p class="eyebrow">404</p>
+          <h1>That page does not exist</h1>
+          <p class="lede">
+            The link is wrong, or it pointed at something that has since moved.
+            Everything the site has is below.
+          </p>
+        </header>
+
+        <div class="cards">
+          <div class="card">
+            <div class="card-mark">1</div>
+            <h3><a href="/how-it-works">How it works</a></h3>
+            <p>
+              The payment flow, and why it takes two signatures rather than one.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card-mark">2</div>
+            <h3><a href="/contract">Contract</a></h3>
+            <p>
+              <code>ScripFacilitator</code> on Coston2, annotated - the interface
+              and every custom error.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card-mark">3</div>
+            <h3><a href="/status">Status</a></h3>
+            <p>
+              What runs, what does not, and the transactions behind each claim.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card-mark">4</div>
+            <h3><a href="/docs">Docs</a></h3>
+            <p>Run it yourself. Node 20, no local node required.</p>
+          </div>
+        </div>
+      </main>
+
+      <footer class="site-footer">
+        <div class="footer-cols">
+          <div class="footer-col">
+            <div class="footer-brand">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="5" r="3" fill="#0FA968" />
+                <circle cx="12" cy="12" r="3.6" fill="#0B7A4B" />
+                <circle cx="12" cy="19" r="3" fill="#34E29B" />
+              </svg>
+              SCRIP
+            </div>
+            <p style="color: var(--ink-muted); font-size: 0.94rem; margin: 0">
+              Machine-payable FXRP on Flare.
+            </p>
+          </div>
+          <div class="footer-col">
+            <h4>Project</h4>
+            <a href="/how-it-works">How it works</a>
+            <a href="/contract">Contract</a>
+            <a href="/status">Status</a>
+            <a href="/docs">Docs</a>
+          </div>
+          <div class="footer-col">
+            <h4>Onchain</h4>
+            <a href="https://coston2-explorer.flare.network/address/0x43F672C0a915F59A2472a07D2108936e217cB04C">Facilitator</a>
+            <a href="https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7">FXRP token</a>
+            <a href="https://faucet.flare.network/coston2">Coston2 faucet</a>
+          </div>
+          <div class="footer-col">
+            <h4>Elsewhere</h4>
+            <a href="https://github.com/Ritapossible/Scrip">GitHub</a>
+            <a href="https://dev.flare.network/ftso/getting-started">FTSO docs</a>
+            <a href="https://dorahacks.io/hackathon/flaresummersignal/">Flare Summer Signal</a>
+          </div>
+        </div>
+        <p class="footer-note">
+          Coston2 testnet only. FXRP here is <code>FTestXRP</code>, backed by
+          testnet XRP and holding no market value. MIT licensed.
+        </p>
+      </footer>
+    </div>
+    <script src="/app.js"></script>
+  </body>
+</html>
