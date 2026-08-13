@@ -1006,6 +1006,23 @@ a.addr-value:hover {
   text-underline-offset: 3px;
 }
 
+/*
+ * The routing panel can carry a link (the live facilitator endpoint). Same
+ * reason as .card h3 a: unstyled it renders browser-blue and underlined, which
+ * is the one thing on the page that would not look designed.
+ */
+.routing .value a {
+  color: var(--brand-deep);
+  text-decoration: none;
+  border-bottom: 2px solid var(--brand-bright);
+  padding-bottom: 1px;
+}
+
+.routing .value a:hover {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
 /* ---------- Accessibility ---------- */
 
 /*

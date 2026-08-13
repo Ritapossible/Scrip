@@ -118,11 +118,11 @@
               </tr>
               <tr>
                 <td>x402 facilitator service + Express middleware</td>
-                <td><span class="pill">runs locally, settles on live Coston2</span></td>
+                <td><span class="pill">hosted and public</span></td>
               </tr>
               <tr>
                 <td>An agent paying a 402 end to end, holding no gas token</td>
-                <td><span class="pill">runs locally, settles on live Coston2</span></td>
+                <td><span class="pill">pays the hosted facilitator</span></td>
               </tr>
               <tr>
                 <td>MCP server - an assistant prices, quotes and pays in conversation</td>
@@ -132,14 +132,28 @@
           </table>
         </div>
 
+        <h2 id="hosted">Where it runs</h2>
+        <p>
+          The facilitator is public, at
+          <a href="https://scrip-production.up.railway.app"><code>scrip-production.up.railway.app</code></a>.
+          Nothing needs installing to see it work:
+        </p>
+
+        <pre><code>curl https://scrip-production.up.railway.app/health
+curl https://scrip-production.up.railway.app/price
+curl -i https://scrip-production.up.railway.app/api/haiku</code></pre>
+
+        <p>
+          The last one answers <code>402</code> with a price in USD, the FXRP it
+          converts to, the FTSO rate it was derived from, and a single-use
+          invoice id - priced at the moment you ask.
+        </p>
+
         <h2 id="live">The payments that actually happened</h2>
         <p>
           Transactions on live Coston2, all paid for by the relayer, all from a
           payer whose C2FLR balance was zero before and after. These are the
-          receipts behind every claim on this site. The service that produced the
-          x402 one runs locally - <code>npm run serve:x402</code> - but the
-          settlements it makes are on the public chain, which is what these
-          hashes are.
+          receipts behind every claim on this site.
         </p>
 
         <div class="table-wrap">
@@ -174,6 +188,13 @@
                 <td>
                   <a href="https://coston2-explorer.flare.network/tx/0xeeef2e1d32468fc71d44695a1995745af0a4b53e2a228c9a66dfe14b8cd6b46d"><code>0xeeef2e1d</code></a>
                   &middot; block 34018086 &middot; 205,698 gas
+                </td>
+              </tr>
+              <tr>
+                <td>An agent paying the <strong>hosted</strong> facilitator</td>
+                <td>
+                  <a href="https://coston2-explorer.flare.network/tx/0xe3cb0532e8824c8ab780ddcacb637ed1aa4ed19a6646764787a63ad6e47d9098"><code>0xe3cb0532</code></a>
+                  &middot; block 34022538 &middot; 205,722 gas
                 </td>
               </tr>
             </tbody>

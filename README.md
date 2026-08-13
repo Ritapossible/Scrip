@@ -11,6 +11,29 @@ on Coston2.
 
 ---
 
+## Try it without installing anything
+
+The facilitator is live at
+**[scrip-production.up.railway.app](https://scrip-production.up.railway.app)**.
+
+```bash
+BASE=https://scrip-production.up.railway.app
+
+curl $BASE/health              # bound to the current FXRP, and says so
+curl $BASE/price               # the live XRP/USD feed it bills against
+curl -i $BASE/api/haiku        # 402, priced in FXRP at that feed, right now
+```
+
+That 402 is the product. It carries a USD price, the FXRP amount it converts to,
+the rate it was derived from so you can check the conversion yourself, and a
+single-use invoice id. To pay one, clone the repo and point the agent at it:
+
+```bash
+npm run agent -- https://scrip-production.up.railway.app/api/haiku
+```
+
+---
+
 ## Who it is for
 
 **Primarily: developers building agents that consume paid APIs.** An agent that
@@ -48,13 +71,16 @@ live Coston2.
 | `settle()` end to end - real FXRP, real signatures | working, on a fork of live Coston2 |
 | Gasless settlement (`settle.ts`) | **working, live Coston2** - [tx `0x4bea1e37`][tx1] |
 | FTSO USD pricing | **working, live Coston2** - invoices priced at the live XRP/USD feed |
-| x402 facilitator service + Express middleware | **working, live Coston2** |
+| x402 facilitator service + Express middleware | **hosted and public** - [scrip-production.up.railway.app][live] |
 | An agent paying a 402 holding no gas token | **working, live Coston2** - [tx `0x975a5ac6`][tx2] |
+| An agent paying the *hosted* facilitator | **working, live Coston2** - [tx `0xe3cb0532`][tx4] |
 | MCP server - an assistant prices, quotes and pays in conversation | **working, live Coston2** - [tx `0xeeef2e1d`][tx3] |
 
 [tx1]: https://coston2-explorer.flare.network/tx/0x4bea1e3775332d6f289a66ced078caa400ae3b524b4097a2b41b39d22147d2b4
 [tx2]: https://coston2-explorer.flare.network/tx/0x975a5ac6625db3e292cd4e12c3952a3e2daa6178fd04297a1158ea3c68c336d2
 [tx3]: https://coston2-explorer.flare.network/tx/0xeeef2e1d32468fc71d44695a1995745af0a4b53e2a228c9a66dfe14b8cd6b46d
+[tx4]: https://coston2-explorer.flare.network/tx/0xe3cb0532e8824c8ab780ddcacb637ed1aa4ed19a6646764787a63ad6e47d9098
+[live]: https://scrip-production.up.railway.app
 
 ---
 
@@ -375,6 +401,7 @@ after:
 | 0.5 FXRP, direct | 33961376 | 222,790 | [`0x4bea1e37`][tx1] |
 | $0.25 via x402 | 33961951 | 205,702 | [`0x975a5ac6`][tx2] |
 | $0.25 via the MCP `pay` tool | 34018086 | 205,698 | [`0xeeef2e1d`][tx3] |
+| $0.25 against the hosted facilitator | 34022538 | 205,722 | [`0xe3cb0532`][tx4] |
 
 [fac]: https://coston2-explorer.flare.network/address/0x43F672C0a915F59A2472a07D2108936e217cB04C
 
