@@ -3,11 +3,36 @@
 **Machine-payable FXRP. Agents pay for what they use, priced in USD, settled on Flare.**
 
 An AI agent hits a paid API. The server answers `402` with a price in US dollars.
-The agent signs one offchain message. The service is paid in FXRP at the live
+The agent signs two offchain messages. The service is paid in FXRP at the live
 FTSO rate. The agent never sends a transaction and never holds a gas token.
 
 Built for [Flare Summer Signal](https://dorahacks.io/hackathon/flaresummersignal/)
 on Coston2.
+
+---
+
+## Who it is for
+
+**Primarily: developers building agents that consume paid APIs.** An agent that
+has to pay for something today needs a gas token on the settlement chain, a
+process to keep topping it up, and a key that can send transactions - three
+problems that have nothing to do with the thing it was built to do. Scrip removes
+all three. The agent holds FXRP, signs two messages offchain, and sends no
+transaction. Its native balance is zero at the start and zero at the end.
+
+**Also: operators of APIs that want to charge per call.** Charging for a route is
+one argument - `requirePayment({ usd: "0.25" })` - and the resource server never
+holds a key or runs a relayer, because the facilitator does both. A service can
+point at a facilitator someone else hosts and start billing in FXRP without
+touching a wallet.
+
+**And: FAssets itself.** FAssets gives XRP a way onto Flare. Very little gives it
+a reason to move once it is there, and a bridged asset that only sits still is a
+bridge with one direction. This is a demand-side use for FXRP - somewhere the
+asset is spent rather than held.
+
+The three roles the rail needs - payer, relayer, payee - are described under
+[Run it](#run-it).
 
 ---
 
@@ -30,6 +55,38 @@ live Coston2.
 [tx1]: https://coston2-explorer.flare.network/tx/0x4bea1e3775332d6f289a66ced078caa400ae3b524b4097a2b41b39d22147d2b4
 [tx2]: https://coston2-explorer.flare.network/tx/0x975a5ac6625db3e292cd4e12c3952a3e2daa6178fd04297a1158ea3c68c336d2
 [tx3]: https://coston2-explorer.flare.network/tx/0xeeef2e1d32468fc71d44695a1995745af0a4b53e2a228c9a66dfe14b8cd6b46d
+
+---
+
+## Built during Flare Summer Signal
+
+All of it. There was no existing product to port and nothing was carried in from
+before the program: the repository's first commit is 10 August 2026 and it has no
+history behind it. Every file listed under [Layout](#layout) was written during
+the hackathon, against Coston2.
+
+| Day | What landed |
+|---|---|
+| 10 Aug | FXRP resolved through the registry rather than hardcoded; the token's EIP-712 domain rebuilt from `eip712Domain()` and checked against its own `DOMAIN_SEPARATOR` |
+| 11 Aug | `ScripFacilitator.sol` - two-signature settlement, delivery measured on arrival; deployed and source-verified on Coston2; the fork test, including the three attacks; the first gasless payment on live Coston2 |
+| 12 Aug | The x402 rail - facilitator service, `requirePayment()` middleware, FTSO-priced invoices, and an agent that pays a 402 holding no gas token |
+| 13 Aug | The MCP server and its spending caps; hosting for the facilitator; the site |
+
+**What was integrated rather than written:** FAssets (FXRP as the settlement
+asset), FTSO (the XRP/USD feed every invoice is priced at), and the Flare
+contract registry (which resolves both, so a redeployment of either does not
+break this code). The x402 shape follows the spec's `accepts` / `X-PAYMENT`
+structure; the deviation from it, and why it was necessary, is described under
+[How a payment works](#how-a-payment-works).
+
+**What took the longest was not what looks hardest.** The contract is
+straightforward. The expensive part was establishing what FXRP actually does -
+that it ships a vendored `ERC20Permit` rather than stock OpenZeppelin, that its
+`decimals` is 6 where Flare's own minting guide suggests 18, and that it
+implements EIP-2612 rather than the EIP-3009 every x402 implementation in the
+wild assumes. Each of those was read off the chain rather than taken from
+documentation, and the third one is why the signing path had to be designed
+rather than copied.
 
 ---
 
