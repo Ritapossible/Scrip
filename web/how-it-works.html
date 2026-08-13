@@ -294,20 +294,22 @@
           <a href="./status#verified">see what is verified</a>.
         </p>
 
-        <h2 id="limitations">Known limitations</h2>
+        <h2 id="limitations">What comes next</h2>
         <p>
           EIP-2612 nonces are sequential per payer, so an agent paying two
-          endpoints concurrently will have the second permit fail on a consumed
-          nonce. EIP-3009's random nonces avoid this, but FXRP does not implement
-          EIP-3009. Payments are serialised per payer until that is addressed.
+          endpoints concurrently has the second permit fail on a consumed nonce.
+          EIP-3009's random nonces avoid this and FXRP does not implement
+          EIP-3009, so payments are serialised per payer today.
         </p>
         <p>
           <code>settled</code> is keyed on <code>invoiceId</code> alone rather
-          than <code>(invoiceId, payer)</code>. Invoice IDs travel the x402 HTTP
-          path, so anyone who sees one can settle their own payment against it
-          first and burn it for the intended payer. No funds are at risk - the
-          intent still binds payer, payee and amount - but the service has to
-          reissue. Namespacing invoice IDs per payer would close it.
+          than <code>(invoiceId, payer)</code>, and invoice IDs travel the x402
+          HTTP path - so anyone who sees one can spend it first. The service
+          recovers from that already: a payment against a spent invoice is
+          answered with a fresh quote, and the client signs the new one and
+          carries on. No funds are at risk either way, since the intent binds
+          payer, payee and amount. Keying on the payer as well closes it at the
+          source, and costs nothing but a mapping key and a redeployment.
         </p>
       </main>
 

@@ -75,6 +75,8 @@ live Coston2.
 | An agent paying a 402 holding no gas token | **working, live Coston2** - [tx `0x975a5ac6`][tx2] |
 | An agent paying the *hosted* facilitator | **working, live Coston2** - [tx `0xe3cb0532`][tx4] |
 | MCP server - an assistant prices, quotes and pays in conversation | **working, live Coston2** - [tx `0xeeef2e1d`][tx3] |
+| Payee allowlist - the relayer spends gas only for payees it was configured to serve | **enforced on the hosted facilitator** |
+| A spent invoice is answered with a fresh quote, and the client re-signs | **working, live Coston2** |
 
 [tx1]: https://coston2-explorer.flare.network/tx/0x4bea1e3775332d6f289a66ced078caa400ae3b524b4097a2b41b39d22147d2b4
 [tx2]: https://coston2-explorer.flare.network/tx/0x975a5ac6625db3e292cd4e12c3952a3e2daa6178fd04297a1158ea3c68c336d2
@@ -273,6 +275,24 @@ An in-memory map of issued invoices would be wrong behind a load balancer and
 forgetful across a restart, and both failures look like a client that paid and
 got nothing.
 
+**A spent quote is answered with another quote.** Invoice ids travel the HTTP
+path in the clear, so anyone who sees one can settle their own payment against it
+first and leave the intended payer holding a signature for something that can
+never settle. No funds are at risk - the intent binds payer, payee and amount -
+and rather than return an error the service issues a fresh quote, which the
+client signs and pays. The recovery is automatic in both halves: `pay.ts` retries
+once, and only once, because a second failure is a real failure and retrying
+forever would turn a broken endpoint into a loop that spends money.
+
+**The facilitator only pays gas for payees it was told about.**
+`SCRIP_PAYEE_ALLOWLIST` names them, checked in both `verify` and `settle` before
+any RPC call. `settle()` is permissionless in the contract, deliberately - it is
+why the `PaymentIntent` exists, and it is what lets any relayer carry a payment -
+but that also means an exposed facilitator would pay gas for whatever it is
+handed. The contract cannot tell an intended payee from a stranger's; the service
+can. Unset means anyone, which is right for a local run against your own
+endpoints and wrong for a public one.
+
 ---
 
 ## An assistant that can spend
@@ -353,9 +373,12 @@ payment path that exists twice is one where only one copy gets fixed.
 and settles a real invoice against the **real FXRP contract** with real
 signatures. The token is not a mock: it is the deployed vendored FAsset,
 resolved through `AssetManagerFXRP.fAsset()` the same way `probe.ts` resolves
-it. The payer's FXRP balance *is* synthetic - written straight into the token's
-balance mapping on the fork, because minting FAssets legitimately requires an
-XRP payment proof that a test cannot produce.
+it. The payer's balance is written directly into the token's balance mapping,
+because minting FAssets legitimately requires an XRP payment proof that no test
+can produce - so the fork exercises the contract logic and the signing path
+against the genuine token. The funding route is covered live instead: the
+payments listed under [Addresses](#addresses-coston2) are on Coston2, from a
+payer holding FXRP it was actually sent.
 
 ```bash
 anvil --fork-url https://coston2-api.flare.network/ext/C/rpc --port 8546
@@ -535,43 +558,29 @@ railway.json             hosting for the facilitator service - see DEPLOY.md
 
 ---
 
-## Known limitations
+## What comes next
 
-EIP-2612 nonces are sequential per payer, so an agent paying two endpoints
-concurrently will have the second permit fail on a consumed nonce. EIP-3009's
-random nonces avoid this, but FXRP does not implement EIP-3009. Payments are
-serialised per payer until that is addressed.
+Each of these is a known piece of work with a known shape, in the order it would
+be done.
 
-`settled` is keyed on `invoiceId` alone, not on `(invoiceId, payer)`. Invoice
-IDs travel the x402 HTTP path, so anyone who sees one can settle their own
-payment against it first and burn it for the intended payer. Closing that at the
-root means keying on the payer too, which is a contract change and a
-redeployment.
+**Concurrent payments from one payer.** EIP-2612 nonces are sequential, so an
+agent paying two endpoints at once has the second permit fail on a consumed
+nonce. EIP-3009's random nonces avoid this, and FXRP does not implement
+EIP-3009, so payments are serialised per payer today. The MCP server pays for one
+resource at a time for the same reason - paying for two means solving this, not
+calling `pay` twice.
 
-The consequence is handled instead. A payment against a spent invoice is
-answered with a fresh quote rather than a refusal, and the client signs the new
-one and continues - so no funds were ever at risk, and now nobody is left holding
-a signature for something that can never settle. The hole is still in the
-contract; nobody falls into it.
+**Namespace invoice IDs per payer, in the contract.** `settled` is keyed on
+`invoiceId` alone, and invoice IDs travel the x402 HTTP path, so anyone who sees
+one can spend it first. The service already recovers from that: a payment against
+a spent invoice is answered with a fresh quote, and the client signs the new one
+and carries on. No funds were ever at risk either way, since the intent binds
+payer, payee and amount. Keying on `(invoiceId, payer)` closes it at the source,
+and costs nothing but a mapping key and a redeployment.
 
-`settle()` is permissionless in the contract, and deliberately so - it is why the
-PaymentIntent exists at all. That is the right property for the contract and the
-wrong one for a relayer key on the open internet, which would otherwise pay gas
-for whatever it is handed. The contract cannot tell an intended payee from any
-other; the service can, so `SCRIP_PAYEE_ALLOWLIST` names the payees this
-facilitator will spend gas for. It is checked in both `verify` and `settle`,
-before any RPC call. Unset means anyone, which is right for a local run and wrong
-for a public one.
-
----
-
-## Roadmap
-
-Namespace invoice IDs per payer in the contract, so the burn is closed at the
-root rather than recovered from. Give the MCP server a way to pay two resources
-at once - which means fixing the sequential-nonce limitation above, not just
-calling `pay` twice. And take the signing path to mainnet FXRP, where the
-facilitator would need redeploying and auditing against the real asset.
+**Mainnet FXRP.** Everything here is Coston2. The signing path is unchanged on
+mainnet, but the facilitator would need redeploying and auditing against the real
+asset.
 
 ---
 

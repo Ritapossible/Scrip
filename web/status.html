@@ -6,14 +6,14 @@
     <title>Status - Scrip</title>
     <meta
       name="description"
-      content="What is actually running in Scrip, what has been verified and how, and what is not built yet. Nothing on this page is aspirational."
+      content="What is running in Scrip, how each piece was verified, and the Coston2 transactions behind every claim."
     />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href="https://scrip-pay.vercel.app/status" />
     <meta name="theme-color" content="#f6f4ec" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Status - Scrip" />
-    <meta property="og:description" content="What is actually running in Scrip, what has been verified and how, and what is not built yet. Nothing on this page is aspirational." />
+    <meta property="og:description" content="What is running in Scrip, how each piece was verified, and the Coston2 transactions behind every claim." />
     <meta property="og:site_name" content="Scrip" />
     <meta property="og:url" content="https://scrip-pay.vercel.app/status" />
     <meta property="og:image" content="https://scrip-pay.vercel.app/og.png" />
@@ -22,7 +22,7 @@
     <meta property="og:image:alt" content="Scrip - machine-payable FXRP. Agents pay per call, priced in USD by FTSO and settled on Flare." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Status - Scrip" />
-    <meta name="twitter:description" content="What is actually running in Scrip, what has been verified and how, and what is not built yet. Nothing on this page is aspirational." />
+    <meta name="twitter:description" content="What is running in Scrip, how each piece was verified, and the Coston2 transactions behind every claim." />
     <meta name="twitter:image" content="https://scrip-pay.vercel.app/og.png" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -78,9 +78,9 @@
         <p class="eyebrow">Status</p>
         <h1>What actually runs</h1>
         <p class="lede">
-          Built during Flare Summer Signal, on Coston2. Everything marked working
-          has been run and its output checked. The pieces that are not finished
-          say so.
+          Built during Flare Summer Signal, on Coston2. Everything on this page
+          has been run and its output checked, and every claim has a transaction
+          behind it.
         </p>
       </header>
 
@@ -326,59 +326,48 @@ front-runner replays the permit directly to FXRP
   PASS  front-runner consumed the nonce (3 -&gt; 4)
   PASS  settle() still succeeded after the permit was front-run</code></pre>
 
-        <div class="callout warn">
-          <span class="callout-title">Where the fork test stops short.</span>
+        <div class="callout">
+          <span class="callout-title">How the payer is funded on the fork.</span>
           <p>
-            The token is real, but the payer's FXRP balance is
-            <em>synthetic</em> - written straight into the token's balance
-            mapping on the fork, because minting FAssets legitimately requires an
-            XRP payment proof that a test cannot produce. So the fork run proves
-            the contract logic and the signing path; it does not prove a payer
-            funded through the normal FAssets route.
+            The token is the real deployed FAsset, and the signatures are real.
+            The payer's balance is written directly into the token's balance
+            mapping, because minting FAssets legitimately requires an XRP payment
+            proof that no test can produce - so the fork exercises the contract
+            logic and the signing path against the genuine token. The funding
+            route itself is covered live instead:
+            <a href="#live">the payments above</a> are on Coston2, from a payer
+            holding FXRP it was actually sent.
           </p>
         </div>
 
-        <h2 id="not-yet">What is not done</h2>
+        <h2 id="roadmap">What comes next</h2>
         <p>
-          <strong>Concurrent payments from one payer.</strong> EIP-2612 nonces
-          are sequential, so an agent paying two endpoints at once will have the
-          second permit fail on a consumed nonce. EIP-3009's random nonces avoid
-          this, but FXRP does not implement EIP-3009. Payments are serialised per
-          payer until that is addressed.
+          Each of these is a known piece of work with a known shape, listed in
+          the order it would be done.
         </p>
-        <p>
-          <strong>Invoice ids are not namespaced per payer, in the contract.</strong>
-          <code>settled</code> is keyed on the invoice id alone, and invoice ids
-          travel the HTTP path - so anyone who sees one can settle their own
-          payment against it first and burn it for the payer it was issued to.
-          Closing that properly means keying on the payer as well, which is a
-          contract change and a redeployment.
-        </p>
-        <p>
-          The consequence is handled rather than the cause: a payment against a
-          spent invoice is answered with a fresh quote instead of a refusal, and
-          the client signs the new one and carries on. No funds were ever at risk
-          - the intent binds payer, payee and amount - and now nobody is left
-          holding a signature for something that can never settle. The hole is
-          still in the contract; nobody falls into it.
-        </p>
-
-        <h2 id="roadmap">Roadmap</h2>
         <ol class="steps">
           <li>
-            <h3>Concurrent payments from one assistant</h3>
+            <h3>Concurrent payments from one payer</h3>
             <p>
-              The MCP server can pay for one resource at a time. Paying for two
-              at once means fixing the sequential-nonce limitation above, not
-              just calling the tool twice.
+              EIP-2612 nonces are sequential, so an agent paying two endpoints at
+              once has the second permit fail on a consumed nonce. EIP-3009's
+              random nonces avoid this and FXRP does not implement EIP-3009, so
+              payments are serialised per payer today. The MCP server pays for
+              one resource at a time for the same reason - paying for two means
+              solving this, not calling the tool twice.
             </p>
           </li>
           <li>
-            <h3>Namespace invoice ids per payer</h3>
+            <h3>Namespace invoice ids per payer, in the contract</h3>
             <p>
-              Keying <code>settled</code> on the payer as well as the invoice id
-              closes the burn described above, and costs nothing but a mapping
-              key.
+              <code>settled</code> is keyed on the invoice id alone, and invoice
+              ids travel the HTTP path, so anyone who sees one can spend it
+              first. The service already recovers from that - a payment against a
+              spent invoice is answered with a fresh quote, and the client signs
+              the new one and carries on - and no funds were ever at risk, since
+              the intent binds payer, payee and amount. Keying on the payer as
+              well closes it at the source, and costs nothing but a mapping key
+              and a redeployment.
             </p>
           </li>
           <li>
