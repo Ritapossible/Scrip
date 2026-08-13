@@ -171,6 +171,38 @@ export function requirePayment(opts: RequirePaymentOptions): RequestHandler {
         payee: payeeAddress,
       });
       if (!verdict.valid) {
+        // An invoice id travels the HTTP path in the clear, and `settled` is
+        // keyed on it alone, so anyone who sees one can settle their own payment
+        // against it first and burn it for the payer it was issued to. No funds
+        // are at risk - the intent still binds payer, payee and amount - but the
+        // quote is spent and the honest payer is holding a signature for
+        // something that can never settle.
+        //
+        // The answer to a burned quote is another quote. Returning the error on
+        // its own would make the caller's next move "ask again", which is what
+        // this does for them; a client that retries on 402 recovers without
+        // knowing any of the above happened.
+        if (verdict.code === "already-settled" || verdict.code === "expired") {
+          res.status(402).json(
+            await buildChallenge({
+              facilitator,
+              resource,
+              usdMicros,
+              usd,
+              payee: payeeAddress,
+              description,
+              mimeType,
+              timeoutSeconds,
+              error:
+                verdict.code === "expired"
+                  ? "that quote expired before it settled. Here is a fresh one."
+                  : "that invoice was already settled, so it cannot be paid again. " +
+                    "Here is a fresh quote for the same resource.",
+            }),
+          );
+          return;
+        }
+
         res.status(402).json({
           x402Version: X402_VERSION,
           error: verdict.reason ?? "payment did not verify",

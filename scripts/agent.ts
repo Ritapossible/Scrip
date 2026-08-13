@@ -55,6 +55,12 @@ async function main(): Promise<void> {
           line("invoice", q.terms.invoiceId);
           break;
         }
+        case "reissued":
+          console.log(
+            `\n  the quote was spent before it settled - signing a fresh one` +
+              `\n  invoice            ${event.quote.terms.invoiceId}`,
+          );
+          break;
         case "check":
           console.log(`  ${event.check.passed ? "PASS" : "FAIL"}  ${event.check.name}`);
           break;

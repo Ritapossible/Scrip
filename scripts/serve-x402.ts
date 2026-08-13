@@ -73,6 +73,21 @@ function requiredKey(name: string): Hex {
   return `0x${body.toLowerCase()}` as Hex;
 }
 
+/**
+ * Addresses this facilitator will spend gas on behalf of, comma separated.
+ * Unset means anyone, which is correct for a local run and wrong for a public
+ * one - so the hosted deployment sets it to its own payee.
+ */
+function payeeAllowlist(): Address[] {
+  const raw = process.env.SCRIP_PAYEE_ALLOWLIST;
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+    .map((entry) => getAddress(entry));
+}
+
 const PORT = Number(process.env.PORT ?? 8402);
 
 // Railway injects its own hostname; used only to print an honest URL at boot.
@@ -132,6 +147,13 @@ function buildApp(facilitator: Facilitator, payee: Address): Express {
       kinds: [{ scheme: SCHEME, network: NETWORK }],
       facilitator: facilitator.address,
       relayer: facilitator.relayer,
+      // Stated rather than discovered: a resource server pointing here should
+      // know whether its payee will be served before it advertises a price.
+      payeePolicy:
+        facilitator.payeeAllowlist.length === 0
+          ? "open - settles for any payee"
+          : "allowlist",
+      payees: facilitator.payeeAllowlist.length === 0 ? undefined : facilitator.payeeAllowlist,
     });
   });
 
@@ -308,12 +330,25 @@ async function main(): Promise<void> {
   let app: Express;
 
   try {
+    const allowlist = payeeAllowlist();
     facilitator = new Facilitator({
       facilitator: getAddress(required("FACILITATOR_ADDRESS")),
       relayerKey: requiredKey("RELAYER_PK"),
       rpcUrl: process.env.RPC_URL,
+      payeeAllowlist: allowlist,
     });
     const payee: Address = getAddress(process.env.PAYEE_ADDRESS ?? facilitator.relayer);
+
+    // A public facilitator that will pay gas for anyone's payee is one anybody
+    // can drain at the rate limiter's pace. Worth a line at boot rather than a
+    // paragraph in a document nobody reads twice.
+    if (allowlist.length === 0) {
+      console.warn(
+        "  warning: SCRIP_PAYEE_ALLOWLIST is not set, so this facilitator will " +
+          "pay gas for a payment to any payee. Fine locally; set it if this is public.",
+      );
+    }
+
     app = buildApp(facilitator, payee);
 
     console.log(`\nScrip x402 facilitator - ${NETWORK}\n`);
@@ -321,6 +356,9 @@ async function main(): Promise<void> {
     console.log(`  facilitator     ${facilitator.address}`);
     console.log(`  relayer         ${facilitator.relayer}`);
     console.log(`  payee           ${payee}`);
+    console.log(
+      `  payee policy    ${allowlist.length === 0 ? "open (any payee)" : `allowlist of ${allowlist.length}`}`,
+    );
     console.log(`  scheme          ${SCHEME}`);
     console.log(`\n  paid resource   GET /api/haiku   ($0.25)`);
     console.log(`  facilitator     GET /supported, POST /verify, POST /settle`);

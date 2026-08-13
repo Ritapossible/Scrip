@@ -128,6 +128,14 @@
                 <td>MCP server - an assistant prices, quotes and pays in conversation</td>
                 <td><span class="pill">runs locally, settles on live Coston2</span></td>
               </tr>
+              <tr>
+                <td>Payee allowlist - the relayer spends gas only for payees it was configured to serve</td>
+                <td><span class="pill">enforced on the hosted facilitator</span></td>
+              </tr>
+              <tr>
+                <td>A spent invoice is answered with a fresh quote, and the client re-signs</td>
+                <td><span class="pill">working, live Coston2</span></td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -339,23 +347,20 @@ front-runner replays the permit directly to FXRP
           payer until that is addressed.
         </p>
         <p>
-          <strong>A payee allowlist.</strong> <code>POST /settle</code> is open,
-          so anyone who can reach the hosted facilitator can make its relayer pay
-          gas for a payment to a payee of their choosing. Permissionless
-          settlement is the contract's design and the reason the PaymentIntent
-          exists at all. The relayer is rate limited to twelve settlement
-          attempts a minute, which bounds how fast it can be drained without
-          stopping it. A facilitator holding funds worth defending would need an
-          allowlist; this one is funded with testnet gas and is deliberately
-          expendable.
-        </p>
-        <p>
-          <strong>Invoice ids are not namespaced per payer.</strong>
+          <strong>Invoice ids are not namespaced per payer, in the contract.</strong>
           <code>settled</code> is keyed on the invoice id alone, and invoice ids
           travel the HTTP path - so anyone who sees one can settle their own
-          payment against it first and burn it for the payer it was issued to. No
-          funds are at risk, because the intent still binds payer, payee and
-          amount, but the service has to reissue the quote.
+          payment against it first and burn it for the payer it was issued to.
+          Closing that properly means keying on the payer as well, which is a
+          contract change and a redeployment.
+        </p>
+        <p>
+          The consequence is handled rather than the cause: a payment against a
+          spent invoice is answered with a fresh quote instead of a refusal, and
+          the client signs the new one and carries on. No funds were ever at risk
+          - the intent binds payer, payee and amount - and now nobody is left
+          holding a signature for something that can never settle. The hole is
+          still in the contract; nobody falls into it.
         </p>
 
         <h2 id="roadmap">Roadmap</h2>
@@ -374,14 +379,6 @@ front-runner replays the permit directly to FXRP
               Keying <code>settled</code> on the payer as well as the invoice id
               closes the burn described above, and costs nothing but a mapping
               key.
-            </p>
-          </li>
-          <li>
-            <h3>A payee allowlist on the hosted facilitator</h3>
-            <p>
-              Rate limiting bounds how fast the relayer can be drained. An
-              allowlist is what stops it, and is the thing to add before a
-              facilitator holds anything worth taking.
             </p>
           </li>
           <li>

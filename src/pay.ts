@@ -89,6 +89,7 @@ export interface Check {
 /** Progress, for callers that show their work while it happens. */
 export type PayEvent =
   | { type: "quoted"; quote: Quote }
+  | { type: "reissued"; quote: Quote }
   | { type: "check"; check: Check }
   | { type: "signed" }
   | { type: "verified"; skipped: boolean; detail?: string }
@@ -370,8 +371,36 @@ export async function payForResource(opts: {
 
   const nativeBefore = await client.getBalance({ address: payer.address });
 
-  const paid = await fetch(url, { headers: { [PAYMENT_HEADER]: encodeHeader(payload) } });
-  const text = await paid.text();
+  let paid = await fetch(url, { headers: { [PAYMENT_HEADER]: encodeHeader(payload) } });
+  let text = await paid.text();
+
+  // A quote can be spent between being issued and being paid: invoice ids travel
+  // the HTTP path, and anyone who sees one can settle their own payment against
+  // it first. The server answers that with a fresh quote rather than a refusal,
+  // so the honest payer's move is simply to sign the new one. Once only - a
+  // second failure is a real failure, and retrying forever would turn a broken
+  // endpoint into a loop that spends money.
+  if (paid.status === 402) {
+    let reissued: Quote | undefined;
+    try {
+      const body = JSON.parse(text) as PaymentRequiredBody;
+      if (body.accepts?.[0] && body.accepts[0].invoiceId !== quote.terms.invoiceId) {
+        reissued = await getQuote(client, url);
+      }
+    } catch {
+      // Not a challenge body; fall through to the error below.
+    }
+
+    if (reissued) {
+      onEvent({ type: "reissued", quote: reissued });
+      const retryPayload = await signPayment(client, payer, reissued);
+      paid = await fetch(url, {
+        headers: { [PAYMENT_HEADER]: encodeHeader(retryPayload) },
+      });
+      text = await paid.text();
+    }
+  }
+
   if (!paid.ok) {
     throw new Error(`payment rejected (${paid.status}): ${text}`);
   }

@@ -107,6 +107,7 @@ Railway → your service → **Variables**. These are the whole configuration.
 | `RELAYER_PK` | `0x…` - the funded Coston2 wallet. Pays all gas. | **Yes** |
 | `FACILITATOR_ADDRESS` | `0x43F672C0a915F59A2472a07D2108936e217cB04C` | **Yes** |
 | `SCRIP_INVOICE_SECRET` | The 32 random bytes from step 3 above | **Yes** |
+| `SCRIP_PAYEE_ALLOWLIST` | The payee address, e.g. `0xaA34e1…D02Bd` | **Yes, on a public deployment** |
 | `TRUST_PROXY` | `1` | **Yes, on Railway** |
 | `RPC_URL` | `https://coston2-api.flare.network/ext/C/rpc` | Optional, this is the default |
 | `PAYEE_ADDRESS` | `0x…` where payments land. Defaults to the relayer. | Optional |
@@ -135,6 +136,14 @@ a rejection it cannot explain. Set it.
 It is an HMAC key and nothing else. It signs no transaction and derives no
 address, so do **not** reuse the relayer's private key here - that would spread a
 funded key into a second variable for no benefit.
+
+**`SCRIP_PAYEE_ALLOWLIST` is what stops a public facilitator being a free gas
+pump.** `settle()` is permissionless in the contract, deliberately - it is the
+reason the PaymentIntent exists, and it is what lets any relayer carry a payment.
+It also means an exposed facilitator will pay gas for a payment to whatever payee
+it is handed. The contract cannot tell your payee from a stranger's; this service
+can, and refuses before it reaches an RPC call. Set it to the address in
+`PAYEE_ADDRESS`. The service warns at boot when it is unset.
 
 **`TRUST_PROXY=1` matters on Railway specifically.** Behind Railway's proxy,
 `req.ip` is the proxy's address unless Express is told to trust one hop. Without

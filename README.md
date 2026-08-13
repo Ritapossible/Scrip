@@ -544,27 +544,34 @@ serialised per payer until that is addressed.
 
 `settled` is keyed on `invoiceId` alone, not on `(invoiceId, payer)`. Invoice
 IDs travel the x402 HTTP path, so anyone who sees one can settle their own
-payment against it first and burn it for the intended payer. No funds are at
-risk - the intent still binds payer, payee and amount - but the service has to
-reissue. Namespacing invoice IDs per payer would close it.
+payment against it first and burn it for the intended payer. Closing that at the
+root means keying on the payer too, which is a contract change and a
+redeployment.
 
-`POST /settle` has no payee allowlist. Permissionless settlement is the
-contract's design - it is why the PaymentIntent exists at all - so anyone who can
-reach the hosted facilitator can make its relayer pay gas for a payment to a
-payee of their choosing. The relayer is rate limited to 12 settlement attempts a
-minute, which bounds how fast it can be drained but does not stop it. A
-facilitator holding funds worth defending needs an allowlist on top; this one is
-funded with testnet gas and deliberately expendable.
+The consequence is handled instead. A payment against a spent invoice is
+answered with a fresh quote rather than a refusal, and the client signs the new
+one and continues - so no funds were ever at risk, and now nobody is left holding
+a signature for something that can never settle. The hole is still in the
+contract; nobody falls into it.
+
+`settle()` is permissionless in the contract, and deliberately so - it is why the
+PaymentIntent exists at all. That is the right property for the contract and the
+wrong one for a relayer key on the open internet, which would otherwise pay gas
+for whatever it is handed. The contract cannot tell an intended payee from any
+other; the service can, so `SCRIP_PAYEE_ALLOWLIST` names the payees this
+facilitator will spend gas for. It is checked in both `verify` and `settle`,
+before any RPC call. Unset means anyone, which is right for a local run and wrong
+for a public one.
 
 ---
 
 ## Roadmap
 
-Namespace invoice IDs per payer to close the burn, give the MCP server a way to
-pay two resources at once - which means fixing the sequential-nonce limitation
-above, not just calling `pay` twice - add a payee allowlist to the hosted
-facilitator, and take the signing path to mainnet FXRP, where the facilitator
-would need redeploying and auditing against the real asset.
+Namespace invoice IDs per payer in the contract, so the burn is closed at the
+root rather than recovered from. Give the MCP server a way to pay two resources
+at once - which means fixing the sequential-nonce limitation above, not just
+calling `pay` twice. And take the signing path to mainnet FXRP, where the
+facilitator would need redeploying and auditing against the real asset.
 
 ---
 

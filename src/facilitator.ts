@@ -41,6 +41,12 @@ export interface VerifyResult {
   valid: boolean;
   reason?: string;
   payer?: Address;
+  /**
+   * A stable identifier for why a payment was rejected, for the cases a caller
+   * needs to act on rather than display. Matching on `reason` would work until
+   * somebody improves the wording.
+   */
+  code?: "already-settled" | "expired" | "payee-not-allowed";
 }
 
 export interface SettleResult extends PaymentResponse {}
@@ -67,8 +73,15 @@ export class Facilitator {
   private readonly wallet: WalletClient;
   readonly relayer: Address;
   private fxrpCache?: FxrpInfo;
+  /** Payees this facilitator will spend gas for. Empty means anyone. */
+  readonly payeeAllowlist: readonly Address[];
 
-  constructor(opts: { facilitator: Address; relayerKey: Hex; rpcUrl?: string }) {
+  constructor(opts: {
+    facilitator: Address;
+    relayerKey: Hex;
+    rpcUrl?: string;
+    payeeAllowlist?: readonly Address[];
+  }) {
     // The public Coston2 RPC is slow on a cold call, well past viem's 10s default.
     const transport = http(opts.rpcUrl, { timeout: 45_000, retryCount: 3 });
     const account = privateKeyToAccount(opts.relayerKey);
@@ -77,6 +90,26 @@ export class Facilitator {
     this.client = createPublicClient({ chain: coston2, transport });
     this.wallet = createWalletClient({ account, chain: coston2, transport });
     this.relayer = account.address;
+    this.payeeAllowlist = (opts.payeeAllowlist ?? []).map(getAddress);
+  }
+
+  /**
+   * `settle()` is permissionless in the contract, and deliberately so - it is why
+   * the PaymentIntent exists. That is the right property for the contract and the
+   * wrong one for a relayer key on the open internet, which pays gas for whatever
+   * it is handed. The contract cannot tell those apart; this service can.
+   *
+   * An empty allowlist keeps the old behaviour, because a facilitator run locally
+   * against your own endpoints has nobody to defend against and configuring one
+   * would only be a way to lock yourself out.
+   */
+  private payeeRejection(payee: Address): string | undefined {
+    if (this.payeeAllowlist.length === 0) return undefined;
+    if (this.payeeAllowlist.includes(getAddress(payee))) return undefined;
+    return (
+      `payee ${payee} is not on this facilitator's allowlist. It pays gas only ` +
+      `for payments to addresses it was configured to serve.`
+    );
   }
 
   /** FXRP never changes within a process run, so resolve it once. */
@@ -144,6 +177,11 @@ export class Facilitator {
     if (expected?.payee && getAddress(expected.payee) !== intent.payee) {
       return { valid: false, reason: "intent payee does not match the issued payee" };
     }
+
+    // Checked before any RPC call: refusing costs nothing, and the answer cannot
+    // change with the state of the chain.
+    const rejected = this.payeeRejection(intent.payee);
+    if (rejected) return { valid: false, code: "payee-not-allowed", reason: rejected };
     if (expected?.amount !== undefined && intent.amount < expected.amount) {
       return {
         valid: false,
@@ -158,11 +196,16 @@ export class Facilitator {
     ]);
 
     if (alreadySettled) {
-      return { valid: false, reason: `invoice ${intent.invoiceId} has already been settled` };
+      return {
+        valid: false,
+        code: "already-settled",
+        reason: `invoice ${intent.invoiceId} has already been settled`,
+      };
     }
     if (intent.deadline <= block.timestamp) {
       return {
         valid: false,
+        code: "expired",
         reason: `intent expired at ${intent.deadline}, chain time is ${block.timestamp}`,
       };
     }
@@ -253,6 +296,11 @@ export class Facilitator {
 
     const payload = raw as PaymentPayload;
     const intent = toIntent(payload);
+
+    // Enforced here as well as in verify(), because settle() is reachable
+    // directly and a check that only guards the polite path guards nothing.
+    const rejected = this.payeeRejection(intent.payee);
+    if (rejected) return { success: false, network: NETWORK, error: rejected };
 
     try {
       // Simulate first so a payment that cannot succeed costs nobody any gas,
