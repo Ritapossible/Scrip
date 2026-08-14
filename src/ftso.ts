@@ -159,7 +159,10 @@ export function parseUsd(input: string): bigint {
   if (!/^\d+(\.\d+)?$/.test(input)) {
     throw new Error(`"${input}" is not a valid USD amount.`);
   }
-  const [whole, frac = ""] = input.split(".");
+  // The regex above guarantees both halves exist, but this is the function that
+  // turns text into an amount of money - it should not depend on a reader
+  // tracing a regex to see that an index is safe.
+  const [whole = "0", frac = ""] = input.split(".");
   if (frac.length > 6) {
     throw new Error("USD amounts finer than a millionth of a dollar are not supported.");
   }

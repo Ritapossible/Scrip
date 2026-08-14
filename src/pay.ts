@@ -31,7 +31,6 @@ import {
   getAddress,
   type Account,
   type Address,
-  type Hex,
   type PublicClient,
 } from "viem";
 import { coston2 } from "./chain.js";
@@ -123,8 +122,20 @@ export async function getQuote(client: PublicClient, url: string): Promise<Quote
       `expected 402 from ${url}, got ${unpaid.status}. Is the endpoint actually paid?`,
     );
   }
+  return quoteFromChallenge(client, url, (await unpaid.json()) as PaymentRequiredBody);
+}
 
-  const challenge = (await unpaid.json()) as PaymentRequiredBody;
+/**
+ * Validate a challenge the caller already has. Split out from `getQuote` so a
+ * server that answers a payment with a fresh quote can be honoured without
+ * asking it for the same thing twice - the 402 body already contains everything
+ * a quote is.
+ */
+export async function quoteFromChallenge(
+  client: PublicClient,
+  url: string,
+  challenge: PaymentRequiredBody,
+): Promise<Quote> {
   const terms = challenge.accepts?.[0];
   if (!terms) throw new Error("402 carried no payment requirements");
   if (terms.scheme !== SCHEME || terms.network !== NETWORK) {
@@ -188,6 +199,44 @@ export async function getQuote(client: PublicClient, url: string): Promise<Quote
     rateUsd: Number(terms.rate.value) / 10 ** terms.rate.decimals,
     checks,
   };
+}
+
+/**
+ * Everything that must be true before a signature exists, for the quote about to
+ * be signed - not for the one that was quoted first.
+ *
+ * The distinction is the whole point. A server can answer a payment with a fresh
+ * quote, and a client that checked its spending cap once and then signed
+ * whatever came back would have no cap at all: quote $0.25, reissue at $500, get
+ * paid. So this runs against every quote immediately before it is signed, and
+ * `payForResource` has no path to `signPayment` that skips it.
+ */
+export async function assertPayable(opts: {
+  client: PublicClient;
+  quote: Quote;
+  payer: Address;
+  maxUsd?: string;
+}): Promise<void> {
+  const { client, quote, payer, maxUsd } = opts;
+
+  if (maxUsd !== undefined && parseUsd(quote.usd) > parseUsd(maxUsd)) {
+    throw new Error(
+      `resource costs $${quote.usd}, which is over the $${maxUsd} cap. Not paying.`,
+    );
+  }
+
+  const balance = await client.readContract({
+    address: quote.fxrp.address,
+    abi: fxrpAbi,
+    functionName: "balanceOf",
+    args: [payer],
+  });
+  if (balance < quote.amount) {
+    throw new Error(
+      `payer holds ${formatUnits(balance, quote.fxrp.decimals)} ${quote.fxrp.symbol}, ` +
+        `invoice is ${quote.amountFormatted}.`,
+    );
+  }
 }
 
 /**
@@ -337,30 +386,7 @@ export async function payForResource(opts: {
   const beforeSigning = quote.checks.length;
   for (const check of quote.checks) onEvent({ type: "check", check });
 
-  // A cap the payer sets is the only limit that binds a server it does not
-  // control, so it is checked against the quote's own USD price rather than
-  // against the FXRP amount, which moves with the feed.
-  if (opts.maxUsd !== undefined) {
-    const cap = parseUsd(opts.maxUsd);
-    if (parseUsd(quote.usd) > cap) {
-      throw new Error(
-        `resource costs $${quote.usd}, which is over the $${opts.maxUsd} cap. Not paying.`,
-      );
-    }
-  }
-
-  const balance = await client.readContract({
-    address: quote.fxrp.address,
-    abi: fxrpAbi,
-    functionName: "balanceOf",
-    args: [payer.address],
-  });
-  if (balance < quote.amount) {
-    throw new Error(
-      `payer holds ${formatUnits(balance, quote.fxrp.decimals)} ${quote.fxrp.symbol}, ` +
-        `invoice is ${quote.amountFormatted}.`,
-    );
-  }
+  await assertPayable({ client, quote, payer: payer.address, maxUsd: opts.maxUsd });
 
   const payload = await signPayment(client, payer, quote);
   for (const check of quote.checks.slice(beforeSigning)) onEvent({ type: "check", check });
@@ -370,6 +396,11 @@ export async function payForResource(opts: {
   onEvent({ type: "verified", ...verified });
 
   const nativeBefore = await client.getBalance({ address: payer.address });
+
+  // Which quote the money actually went to. A reissue replaces it, so a caller
+  // metering spend reads the price that was paid rather than the one first
+  // offered.
+  let settledQuote = quote;
 
   let paid = await fetch(url, { headers: { [PAYMENT_HEADER]: encodeHeader(payload) } });
   let text = await paid.text();
@@ -385,7 +416,10 @@ export async function payForResource(opts: {
     try {
       const body = JSON.parse(text) as PaymentRequiredBody;
       if (body.accepts?.[0] && body.accepts[0].invoiceId !== quote.terms.invoiceId) {
-        reissued = await getQuote(client, url);
+        // Validated from the body the server already sent, rather than asking
+        // again: the challenge is a complete quote, and re-fetching would both
+        // cost a round trip and quote a third invoice nobody asked for.
+        reissued = await quoteFromChallenge(client, url, body);
       }
     } catch {
       // Not a challenge body; fall through to the error below.
@@ -393,11 +427,16 @@ export async function payForResource(opts: {
 
     if (reissued) {
       onEvent({ type: "reissued", quote: reissued });
+      // The reissued quote is a quote like any other, and gets checked like
+      // one. A cap that survived only the first quote would be no cap.
+      await assertPayable({ client, quote: reissued, payer: payer.address, maxUsd: opts.maxUsd });
       const retryPayload = await signPayment(client, payer, reissued);
       paid = await fetch(url, {
         headers: { [PAYMENT_HEADER]: encodeHeader(retryPayload) },
       });
       text = await paid.text();
+      // What the caller actually paid, so budget accounting sees the real price.
+      settledQuote = reissued;
     }
   }
 
@@ -423,7 +462,7 @@ export async function payForResource(opts: {
     statusText: paid.statusText,
     body,
     receipt,
-    quote,
+    quote: settledQuote,
     nativeBefore,
     nativeAfter,
     gasless: nativeBefore === 0n && nativeAfter === 0n,

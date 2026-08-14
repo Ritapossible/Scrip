@@ -30,7 +30,6 @@ import {
   parseAbiParameters,
   formatUnits,
   getAddress,
-  type Address,
 } from "viem";
 import { coston2, FLARE_CONTRACT_REGISTRY, addressUrl } from "../src/chain.js";
 

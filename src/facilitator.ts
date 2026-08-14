@@ -29,6 +29,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { coston2 } from "./chain.js";
 import { fxrpAbi, facilitatorAbi, explainRevert } from "./abi.js";
 import { resolveFxrp, type FxrpInfo } from "./fxrp.js";
+import { resolveFtsoV2 } from "./ftso.js";
 import { intentDigest, type PaymentIntent } from "./eip712.js";
 import {
   assertPayload,
@@ -50,6 +51,19 @@ export interface VerifyResult {
 }
 
 export interface SettleResult extends PaymentResponse {}
+
+/**
+ * The facilitator is bound to a token the registry no longer resolves to.
+ *
+ * Distinguished from every other startup failure because it is the only one
+ * waiting cannot fix: `token` is immutable, so this needs a redeployment, while
+ * an unreachable RPC needs a minute. A service that treats them alike either
+ * retries forever on a permanent fault or gives up permanently on a transient
+ * one - and the second is how a deploy dies on a network hiccup.
+ */
+export class FxrpBindingError extends Error {
+  override readonly name = "FxrpBindingError";
+}
 
 /** Rebuild the strongly typed intent from the JSON that came over the wire. */
 function toIntent(payload: PaymentPayload): PaymentIntent {
@@ -73,6 +87,7 @@ export class Facilitator {
   private readonly wallet: WalletClient;
   readonly relayer: Address;
   private fxrpCache?: FxrpInfo;
+  private ftsoCache?: Address;
   /** Payees this facilitator will spend gas for. Empty means anyone. */
   readonly payeeAllowlist: readonly Address[];
 
@@ -119,6 +134,17 @@ export class Facilitator {
   }
 
   /**
+   * FtsoV2's address comes from the same registry and changes just as rarely, so
+   * looking it up on every quote was a round trip to a public RPC for an answer
+   * that does not move. The feed reading itself is never cached - that is the
+   * part that has to be current.
+   */
+  async ftsoV2(): Promise<Address> {
+    this.ftsoCache ??= await resolveFtsoV2(this.client);
+    return this.ftsoCache;
+  }
+
+  /**
    * The facilitator's `token` is immutable, so one bound to a stale FXRP can
    * never be fixed, only redeployed. Checked at startup rather than discovered
    * inside a revert during a demo.
@@ -131,7 +157,7 @@ export class Facilitator {
       functionName: "token",
     });
     if (getAddress(bound) !== getAddress(fxrp.address)) {
-      throw new Error(
+      throw new FxrpBindingError(
         `facilitator is bound to ${bound} but the registry resolves FXRP to ` +
           `${fxrp.address}. Redeploy the facilitator against the current token.`,
       );

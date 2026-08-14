@@ -36,7 +36,7 @@ import "dotenv/config";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { formatUnits, getAddress, type Address, type Hex } from "viem";
+import { formatUnits, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { fxrpAbi } from "../src/abi.js";
 import { resolveFxrp } from "../src/fxrp.js";
@@ -71,6 +71,21 @@ const perCallCap = parseUsd(MAX_PER_CALL);
 const sessionCap = parseUsd(MAX_SESSION);
 /** Micro-dollars spent by this process. Only ever goes up. */
 let spent = 0n;
+/**
+ * Micro-dollars committed to payments that have not finished yet.
+ *
+ * A tool call is not atomic, and an MCP client may have several in flight. With
+ * only `spent` to check against, two concurrent calls both read a budget that
+ * still looks unspent, both pass, and the session quietly exceeds its ceiling.
+ * Reserving up front and releasing in a `finally` closes that window.
+ */
+let reserved = 0n;
+/**
+ * Resources with a payment in flight. Paying for the same thing twice because a
+ * client retried a call that had not returned yet is not something the chain can
+ * undo - each attempt is a distinct invoice and both would settle.
+ */
+const inFlight = new Set<string>();
 
 /**
  * Money, written the way money is written. formatUsd trims trailing zeros, which
@@ -167,7 +182,8 @@ server.registerTool(
         client.getBalance({ address: payer.address }),
       ]);
 
-      const remaining = sessionCap > spent ? sessionCap - spent : 0n;
+      const committed = spent + reserved;
+      const remaining = sessionCap > committed ? sessionCap - committed : 0n;
 
       return ok(
         [
@@ -270,13 +286,19 @@ server.registerTool(
       return fail("No payer key. Set PAYER_PK in .env before paying for anything.");
     }
 
+    if (inFlight.has(url)) {
+      return fail(
+        `a payment for ${url} is already in progress. Wait for it rather than ` +
+          `starting a second one - each attempt is its own invoice, and both would settle.`,
+      );
+    }
+
+    let reservation = 0n;
     try {
       const quote = await getQuote(client, url);
       const price = parseUsd(quote.usd);
 
-      // The caller may tighten the cap but never loosen it. Checked here rather
-      // than passed through, so a lower ceiling cannot be argued upward by
-      // anything the resource server sends back.
+      // The caller may tighten the cap but never loosen it.
       const cap = maxUsd !== undefined ? min(parseUsd(maxUsd), perCallCap) : perCallCap;
       if (price > cap) {
         return fail(
@@ -284,30 +306,50 @@ server.registerTool(
             `Not paying. Raise SCRIP_MAX_USD_PER_CALL if this is intended.`,
         );
       }
-      if (spent + price > sessionCap) {
+
+      // Counted against payments still in flight as well as finished ones, or
+      // two concurrent calls both see an unspent budget and both proceed.
+      const committed = spent + reserved;
+      if (committed + price > sessionCap) {
         return fail(
-          `paying $${quote.usd} would take this session to $${money(spent + price)}, ` +
-            `over the $${money(sessionCap)} budget. Already spent $${money(spent)}. ` +
-            `Restart the server or raise SCRIP_MAX_USD_SESSION.`,
+          `paying $${quote.usd} would take this session to $${money(committed + price)}, ` +
+            `over the $${money(sessionCap)} budget. Already spent $${money(spent)}` +
+            (reserved > 0n ? `, with $${money(reserved)} in flight` : "") +
+            `. Restart the server or raise SCRIP_MAX_USD_SESSION.`,
         );
       }
 
-      const result = await payForResource({ client, payer, url, quote });
+      reservation = price;
+      reserved += reservation;
+      inFlight.add(url);
 
-      // Only count what actually settled.
-      spent += price;
+      // The ceiling goes with the payment. A server may answer with a fresh
+      // quote at a price of its choosing, and without this the client would sign
+      // it - so the effective cap is the tighter of this call's limit and what
+      // is left of the session, enforced again before any re-signing.
+      const remaining = sessionCap > committed ? sessionCap - committed : 0n;
+      const result = await payForResource({
+        client,
+        payer,
+        url,
+        quote,
+        maxUsd: money(min(cap, remaining)),
+      });
+
+      // What was actually paid, which is not the first quote if it was reissued.
+      spent += parseUsd(result.quote.usd);
 
       const receipt = result.receipt;
       const delivered = receipt?.delivered
-        ? `${formatUnits(BigInt(receipt.delivered), quote.fxrp.decimals)} ${quote.fxrp.symbol}`
-        : quote.amountFormatted;
+        ? `${formatUnits(BigInt(receipt.delivered), result.quote.fxrp.decimals)} ${result.quote.fxrp.symbol}`
+        : result.quote.amountFormatted;
 
       const body =
         typeof result.body === "string" ? result.body : JSON.stringify(result.body, null, 2);
 
       return ok(
         [
-          `Paid $${quote.usd} (${delivered}) for ${url}`,
+          `Paid $${result.quote.usd} (${delivered}) for ${url}`,
           ``,
           `${result.status} - the resource:`,
           body,
@@ -330,6 +372,11 @@ server.registerTool(
       );
     } catch (err) {
       return fail(`payment failed for ${url}: ${(err as Error).message}`);
+    } finally {
+      // Released whether the payment settled, was refused or threw. `spent` has
+      // already absorbed anything that actually moved.
+      reserved -= reservation;
+      inFlight.delete(url);
     }
   },
 );

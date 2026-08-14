@@ -109,6 +109,7 @@ Railway → your service → **Variables**. These are the whole configuration.
 | `SCRIP_INVOICE_SECRET` | The 32 random bytes from step 3 above | **Yes** |
 | `SCRIP_PAYEE_ALLOWLIST` | The payee address, e.g. `0xaA34e1…D02Bd` | **Yes, on a public deployment** |
 | `TRUST_PROXY` | `1` | **Yes, on Railway** |
+| `SCRIP_PUBLIC_URL` | Only on a host that does not set `RAILWAY_PUBLIC_DOMAIN` | Optional on Railway |
 | `RPC_URL` | `https://coston2-api.flare.network/ext/C/rpc` | Optional, this is the default |
 | `PAYEE_ADDRESS` | `0x…` where payments land. Defaults to the relayer. | Optional |
 | `PORT` | Leave unset - Railway injects one | Optional |
@@ -215,10 +216,24 @@ So `GET /health` reports which state it is in:
 
 | `status` | HTTP | Meaning |
 |---|---|---|
-| `checking` | 200 | Listening; the FXRP binding check has not finished. Normal for the first few seconds. |
+| `checking` | 200 | Listening; the FXRP binding check has not finished, or the chain is briefly unreachable and it is retrying. |
 | `ready` | 200 | Bound to the current FXRP. Everything works. |
-| `broken` | 503 | The binding check failed. Waiting will not fix it; the `error` field says why. |
+| `broken` | 503 | The facilitator is bound to a token the registry no longer resolves to. Waiting will not fix it - this needs a redeployment. |
 | `misconfigured` | 503 | A variable is missing or unparseable. The `error` field names it. |
+
+Only a binding mismatch is treated as permanent. An unreachable RPC keeps the
+service in `checking` and retries with backoff, because a container that started
+a second before its egress did is not a broken deployment - and marking it broken
+would fail the health check and kill a build that was about to work.
+
+`/health` also reports the relayer's balance:
+
+```json
+"gas": { "relayerBalance": "97.312125325", "low": false }
+```
+
+It pays for every settlement and nothing refills it, so `low: true` is the signal
+to top it up before payments start failing for reasons that read like bugs.
 
 A missing `RELAYER_PK` no longer kills the process. The service starts anyway and
 serves the reason on every endpoint, so a failed deploy can be diagnosed by

@@ -26,11 +26,11 @@
 import "dotenv/config";
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import rateLimit from "express-rate-limit";
-import { getAddress, type Address, type Hex } from "viem";
-import { Facilitator } from "../src/facilitator.js";
+import { getAddress, formatEther, parseEther, type Address, type Hex } from "viem";
+import { Facilitator, FxrpBindingError } from "../src/facilitator.js";
 import { requirePayment } from "../src/middleware.js";
-import { resolveFtsoV2, readFeed, XRP_USD_FEED_ID } from "../src/ftso.js";
-import { SCHEME, NETWORK, X402_VERSION } from "../src/x402.js";
+import { readFeed, XRP_USD_FEED_ID } from "../src/ftso.js";
+import { SCHEME, NETWORK, X402_VERSION, PAYMENT_HEADER } from "../src/x402.js";
 import { txUrl } from "../src/chain.js";
 
 function required(name: string): string {
@@ -88,6 +88,14 @@ function payeeAllowlist(): Address[] {
     .map((entry) => getAddress(entry));
 }
 
+/**
+ * Below this, the relayer is close enough to empty to be worth saying so. A
+ * settlement costs roughly 200k gas, so this is a few hundred payments of
+ * headroom rather than an emergency - the point is to be told before the demo
+ * stops working, not after.
+ */
+const LOW_GAS_THRESHOLD = parseEther("1");
+
 const PORT = Number(process.env.PORT ?? 8402);
 
 // Railway injects its own hostname; used only to print an honest URL at boot.
@@ -120,24 +128,65 @@ function buildApp(facilitator: Facilitator, payee: Address): Express {
 
   /**
    * The relayer pays gas for anything that settles, and this service is public,
-   * so an unmetered /settle is an open invitation to drain it. The limit is
-   * loose enough that a demo never touches it and tight enough that the relayer
-   * survives being found by a bot.
+   * so an unmetered path to settlement is an open invitation to drain it.
    *
-   * Only the two endpoints that cost something are limited. /health, /supported,
-   * /price and /api/haiku stay open - those are what a reader actually hits, and
-   * an unpaid /api/haiku only reads a price feed.
+   * What gets metered is the cost, not the route. A request carrying X-PAYMENT
+   * reaches `settle()` whether it arrives at POST /settle or at the priced
+   * resource, so both cost the same allowance - limiting only the facilitator
+   * endpoint left the identical spend reachable through the other door. Requests
+   * that settle nothing are metered separately and far more loosely, because
+   * they still cost RPC round trips and those are worth having a ceiling on too.
+   *
+   * `Retry-After` is the part a client can act on. The draft-7 `RateLimit`
+   * header carries the same reset, but far more clients understand this one, and
+   * a caller that cannot tell how long to wait retries immediately and stays
+   * limited.
    */
-  const spendLimiter = rateLimit({
-    windowMs: 60_000,
-    limit: 12,
-    standardHeaders: "draft-7",
-    legacyHeaders: false,
-    message: {
-      x402Version: X402_VERSION,
-      error: "rate limited: this public facilitator caps settlement attempts per minute",
-    },
-  });
+  const limiter = (limit: number, note: string, only: "paid" | "unpaid" | "all") =>
+    rateLimit({
+      windowMs: 60_000,
+      limit,
+      standardHeaders: "draft-7",
+      legacyHeaders: false,
+      skip: (req: Request) => {
+        if (only === "all") return false;
+        const carriesPayment = Boolean(req.get(PAYMENT_HEADER));
+        return only === "paid" ? !carriesPayment : carriesPayment;
+      },
+      handler: (_req: Request, res: Response) => {
+        res.setHeader("Retry-After", "60");
+        res.status(429).json({ x402Version: X402_VERSION, error: `rate limited: ${note}` });
+      },
+    });
+
+  const spendLimiter = limiter(
+    12,
+    "this public facilitator caps settlement attempts per minute",
+    "all",
+  );
+
+  /**
+   * A request carrying X-PAYMENT reaches settle() and spends the relayer's gas,
+   * which is the thing worth metering - and metering it only on POST /settle
+   * left the same spend reachable through the priced route, unmetered. The two
+   * paths now cost the same allowance.
+   */
+  const paidRouteLimiter = limiter(
+    12,
+    "settlement attempts through this resource are capped per minute",
+    "paid",
+  );
+
+  /**
+   * An unpaid request settles nothing, but it does resolve the FTSO feed and read
+   * a block to price a quote - three round trips to a public RPC, per request,
+   * for anyone who asks. Loose enough that a reader never notices, tight enough
+   * that the endpoint cannot be used to exhaust an RPC quota.
+   */
+  const quoteLimiter = limiter(60, "quote requests are capped per minute", "unpaid");
+
+  /** Same reasoning as the quote limiter, for the reads that are not quotes. */
+  const readLimiter = limiter(60, "price reads are capped per minute", "all");
 
   // --- facilitator endpoints -------------------------------------------------
 
@@ -186,6 +235,8 @@ function buildApp(facilitator: Facilitator, payee: Address): Express {
 
   app.get(
     "/api/haiku",
+    paidRouteLimiter,
+    quoteLimiter,
     requirePayment({
       facilitator,
       payee,
@@ -241,12 +292,29 @@ function buildApp(facilitator: Facilitator, payee: Address): Express {
    * genuinely up. It answers 503 only once the check has definitively failed,
    * which is a condition waiting cannot fix.
    */
-  app.get("/health", (_req: Request, res: Response) => {
+  app.get("/health", async (_req: Request, res: Response) => {
+    // The relayer pays for every settlement and nothing tops it up. An empty one
+    // fails payments with a message about funds rather than about payments, so
+    // the balance is reported where a monitor can watch it instead of being
+    // something you remember to check.
+    let gas: { relayerBalance: string; low: boolean } | undefined;
+    try {
+      const balance = await facilitator.client.getBalance({ address: facilitator.relayer });
+      gas = {
+        relayerBalance: formatEther(balance),
+        low: balance < LOW_GAS_THRESHOLD,
+      };
+    } catch {
+      // A health check that fails because an RPC hiccupped is worse than one
+      // that answers without the balance.
+    }
+
     const body = {
       ok: readiness.state !== "broken",
       status: readiness.state,
       facilitator: facilitator.address,
       relayer: facilitator.relayer,
+      ...(gas ? { gas } : {}),
       ...(readiness.state === "ready" ? { asset: readiness.asset } : {}),
       ...(readiness.state === "broken" ? { error: readiness.error } : {}),
     };
@@ -254,9 +322,9 @@ function buildApp(facilitator: Facilitator, payee: Address): Express {
   });
 
   /** The live rate, so the pricing on a 402 can be checked independently. */
-  app.get("/price", async (_req: Request, res: Response, next: NextFunction) => {
+  app.get("/price", readLimiter, async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      const ftsoV2 = await resolveFtsoV2(facilitator.client);
+      const ftsoV2 = await facilitator.ftsoV2();
       const reading = await readFeed(facilitator.client, ftsoV2);
       res.json({
         feedId: XRP_USD_FEED_ID,
@@ -308,7 +376,7 @@ function buildDiagnosticApp(error: string): Express {
  * port is open, so a slow answer costs a moment of "checking" rather than the
  * whole deployment.
  */
-async function verify(facilitator: Facilitator): Promise<void> {
+async function verify(facilitator: Facilitator, attempt = 1): Promise<void> {
   try {
     await facilitator.assertBoundToCurrentFxrp();
     const fxrp = await facilitator.fxrp();
@@ -317,11 +385,40 @@ async function verify(facilitator: Facilitator): Promise<void> {
       asset: `${fxrp.address} (${fxrp.symbol}, ${fxrp.decimals} decimals)`,
     };
     console.log(`  asset           ${readiness.asset}`);
+
+    const gas = await facilitator.client.getBalance({ address: facilitator.relayer });
+    console.log(`  relayer gas     ${formatEther(gas)} C2FLR`);
+    if (gas < LOW_GAS_THRESHOLD) {
+      console.warn(
+        `  warning: the relayer holds ${formatEther(gas)} C2FLR. It pays for every ` +
+          `settlement and nothing refills it.`,
+      );
+    }
+
     console.log(`\n  ready\n`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    readiness = { state: "broken", error: message };
-    console.error(`\n  startup check failed: ${message}\n`);
+
+    // Only a binding mismatch is permanent. Everything else here is the network
+    // - a cold public RPC, a DNS blip, a container that started before its
+    // egress did - and treating those as fatal is how a deployment dies of a
+    // hiccup: the service marks itself broken, answers 503 for good, and the
+    // platform's health check fails a build that would have worked a second
+    // later.
+    if (err instanceof FxrpBindingError) {
+      readiness = { state: "broken", error: message };
+      console.error(`\n  startup check failed, and waiting will not help: ${message}\n`);
+      return;
+    }
+
+    // Stays "checking", so /health keeps answering 200 while the chain is out of
+    // reach. The service genuinely is up; it just cannot prove its binding yet.
+    const delaySeconds = Math.min(30, 2 ** Math.min(attempt, 5));
+    console.error(
+      `  startup check attempt ${attempt} could not reach the chain, retrying in ` +
+        `${delaySeconds}s: ${message.split("\n")[0]}`,
+    );
+    setTimeout(() => void verify(facilitator, attempt + 1), delaySeconds * 1000).unref();
   }
 }
 

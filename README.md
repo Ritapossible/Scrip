@@ -442,8 +442,15 @@ git clone https://github.com/Ritapossible/Scrip.git
 cd Scrip
 npm install
 npm run probe     # read-only, no keys, no gas
+npm test          # unit tests: the money math, and the spending caps
+npm run typecheck
 npm run web       # http://127.0.0.1:8080
 ```
+
+`npm test` needs no keys, no network and no chain - it covers the USD-to-FXRP
+arithmetic, its rounding direction, and the spending caps including the reissued
+quote that once slipped past them. It runs on every push, along with the
+typecheck.
 
 Use `npm run web` rather than a plain static server: the pages link to `./docs`
 without an extension, which production resolves through Vercel's `cleanUrls`. A
@@ -533,6 +540,9 @@ src/
   facilitator.ts         verify() and settle() against the chain
   middleware.ts          requirePayment() - charge for an Express route
   pay.ts                 the client side: quote, check, sign, pay
+test/
+  money.test.ts          USD -> FXRP arithmetic, rounding, feed edge cases
+  caps.test.ts           the spending caps, including on a reissued quote
 scripts/
   probe.ts               read-only: resolve FXRP, verify the signing domain
   price.ts               read-only: what is $X in FXRP right now?

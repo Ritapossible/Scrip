@@ -22,7 +22,6 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 import type { Facilitator } from "./facilitator.js";
 import {
   readFeed,
-  resolveFtsoV2,
   assertFresh,
   usdToTokenAmount,
   parseUsd,
@@ -80,9 +79,29 @@ function invoiceIdFor(resource: string, amount: bigint, deadline: bigint): Hex {
   return keccak256(toHex(mac));
 }
 
+/**
+ * The origin quotes are bound to.
+ *
+ * Falling back to the Host header means the client picks what the invoice is
+ * bound to, since Host is whatever the caller sends. Nothing can be stolen that
+ * way - the payee and amount live in the signed intent - but "this quote is for
+ * this resource" is a weaker statement than it reads when the resource is
+ * whatever the payer said it was. A deployment that knows its own address should
+ * say so, and on Railway it already does.
+ */
+const PUBLIC_ORIGIN: string | undefined = (() => {
+  const explicit = process.env.SCRIP_PUBLIC_URL;
+  if (explicit) return explicit.replace(/\/+$/, "");
+  const railway = process.env.RAILWAY_PUBLIC_DOMAIN;
+  return railway ? `https://${railway}` : undefined;
+})();
+
 function resourceUrl(req: Request): string {
+  const path = `${req.baseUrl}${req.path}`;
+  if (PUBLIC_ORIGIN) return `${PUBLIC_ORIGIN}${path}`;
+  // Local development, where there is no canonical origin to know.
   const host = req.get("host") ?? "localhost";
-  return `${req.protocol}://${host}${req.baseUrl}${req.path}`;
+  return `${req.protocol}://${host}${path}`;
 }
 
 export function requirePayment(opts: RequirePaymentOptions): RequestHandler {
@@ -244,7 +263,7 @@ async function buildChallenge(args: {
 
   const [fxrp, ftsoV2, block] = await Promise.all([
     facilitator.fxrp(),
-    resolveFtsoV2(facilitator.client),
+    facilitator.ftsoV2(),
     facilitator.client.getBlock(),
   ]);
 

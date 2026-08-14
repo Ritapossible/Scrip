@@ -37,6 +37,10 @@ npm run price
   relayer.
 - **Rate limit:** the facilitator allows 12 settlement attempts a minute. Normal
   recording never touches it; hammering it in retakes might.
+- **Payee allowlist:** the hosted facilitator only spends gas for
+  `0xaA34e1…D02Bd`. Filming against `/api/haiku` is unaffected, because that is
+  the payee it quotes. Point the agent at a resource that names a different payee
+  and it will be refused - correctly, but not on camera.
 - **MCP:** if you are filming that section, have your assistant client already
   connected and the tool list visible once, so the viewer sees the tools exist.
 
@@ -182,6 +186,7 @@ This is the answer to "is the integration superficial?" Say it plainly.
 | `payer holds … invoice is …` | Payer is out of FXRP | `npm run fund -- 2`, then re-run |
 | `FTSO feed is …s old` | Coston2's feed stalled | Wait a minute. Billing against a stale feed is refused on purpose |
 | `rate limited` | More than 12 settlements in a minute | Wait sixty seconds |
+| `payee … is not on this facilitator's allowlist` | The resource quotes a payee the hosted facilitator was not configured to serve | Expected against a third-party endpoint; use `/api/haiku` for the demo |
 | A long pause before the 402 | Cold public RPC | Pre-warm with `/health` before recording |
 | `status":"checking"` on health | Service is up, still verifying its FXRP binding | Wait a few seconds and curl again |
 

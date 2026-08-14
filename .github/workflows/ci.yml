@@ -1,0 +1,36 @@
+# Typecheck, unit tests and a dependency check on every push.
+#
+# The fork test is deliberately not here: it needs anvil and a live Coston2 RPC,
+# so it would fail for reasons that have nothing to do with the change being
+# tested. It stays a thing you run deliberately - see README.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      # Advisory rather than blocking: a transitive advisory published overnight
+      # should be visible without stopping an unrelated change from merging.
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+        continue-on-error: true

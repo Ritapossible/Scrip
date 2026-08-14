@@ -19,7 +19,8 @@
     "mcp": "tsx scripts/mcp.ts",
     "web": "node scripts/serve-web.mjs",
     "typecheck": "tsc --noEmit",
-    "test:fork": "node scripts/settle-fork-test.mjs"
+    "test:fork": "node scripts/settle-fork-test.mjs",
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "keywords": [
     "flare",
