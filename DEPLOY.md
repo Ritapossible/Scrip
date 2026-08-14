@@ -11,7 +11,7 @@ What is being deployed, and what is not:
 |---|---|
 | Facilitator service (`/supported`, `/verify`, `/settle`, `/api/haiku`, `/price`) | **Railway** - this document |
 | Marketing / docs site (`web/`) | Vercel, static, no build step (`vercel.json`) |
-| `ScripFacilitator.sol` | Already deployed on Coston2 at `0x43F672C0a915F59A2472a07D2108936e217cB04C` |
+| `ScripFacilitator.sol` | Already deployed on Coston2 at `0x37A6D9C298B4b6E5Be17D4412B2Fc61097953e93` |
 | `probe`, `price`, `settle`, `agent`, `test:fork` | Your machine |
 | MCP server (`npm run mcp`) | Your machine - it speaks stdio to a local client and holds the payer key, so it is deliberately not hosted |
 
@@ -105,7 +105,7 @@ Railway → your service → **Variables**. These are the whole configuration.
 | Variable | Value | Required |
 |---|---|---|
 | `RELAYER_PK` | `0x…` - the funded Coston2 wallet. Pays all gas. | **Yes** |
-| `FACILITATOR_ADDRESS` | `0x43F672C0a915F59A2472a07D2108936e217cB04C` | **Yes** |
+| `FACILITATOR_ADDRESS` | `0x37A6D9C298B4b6E5Be17D4412B2Fc61097953e93` | **Yes** |
 | `SCRIP_INVOICE_SECRET` | The 32 random bytes from step 3 above | **Yes** |
 | `SCRIP_PAYEE_ALLOWLIST` | The payee address, e.g. `0xaA34e1…D02Bd` | **Yes, on a public deployment** |
 | `TRUST_PROXY` | `1` | **Yes, on Railway** |
@@ -185,7 +185,7 @@ Deploy logs. A healthy start looks like this:
 Scrip x402 facilitator - flare-coston2
 
   listening       https://scrip-production.up.railway.app
-  facilitator     0x43F672C0a915F59A2472a07D2108936e217cB04C
+  facilitator     0x37A6D9C298B4b6E5Be17D4412B2Fc61097953e93
   relayer         0xaA34e14a0e0B2fdD8Ad10F06bC0907fA0b1D02Bd
   payee           0xaA34e14a0e0B2fdD8Ad10F06bC0907fA0b1D02Bd
   scheme          exact-permit2612

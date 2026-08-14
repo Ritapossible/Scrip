@@ -154,10 +154,12 @@ async function main(): Promise<void> {
       address: facilitator,
       abi: facilitatorAbi,
       functionName: "settled",
-      args: [invoiceId],
+      args: [invoiceId, payer.address],
     }),
   ]);
-  if (alreadySettled) throw new Error(`invoice ${invoiceId} has already been settled.`);
+  if (alreadySettled) {
+    throw new Error(`invoice ${invoiceId} has already been settled by ${payer.address}.`);
+  }
 
   const localDigest = intentDigest(facilitator, intent);
 

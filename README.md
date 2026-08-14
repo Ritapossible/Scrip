@@ -77,11 +77,14 @@ live Coston2.
 | MCP server - an assistant prices, quotes and pays in conversation | **working, live Coston2** - [tx `0xeeef2e1d`][tx3] |
 | Payee allowlist - the relayer spends gas only for payees it was configured to serve | **enforced on the hosted facilitator** |
 | A spent invoice is answered with a fresh quote, and the client re-signs | **working, live Coston2** |
+| Invoice ids namespaced per payer - a stranger cannot burn a quote | **working, live Coston2** - [tx `0x10ff52e5`][tx5] |
+| Zero-amount settlements refused | **working, live Coston2** - `ZeroAmount` |
 
 [tx1]: https://coston2-explorer.flare.network/tx/0x4bea1e3775332d6f289a66ced078caa400ae3b524b4097a2b41b39d22147d2b4
 [tx2]: https://coston2-explorer.flare.network/tx/0x975a5ac6625db3e292cd4e12c3952a3e2daa6178fd04297a1158ea3c68c336d2
 [tx3]: https://coston2-explorer.flare.network/tx/0xeeef2e1d32468fc71d44695a1995745af0a4b53e2a228c9a66dfe14b8cd6b46d
 [tx4]: https://coston2-explorer.flare.network/tx/0xe3cb0532e8824c8ab780ddcacb637ed1aa4ed19a6646764787a63ad6e47d9098
+[tx5]: https://coston2-explorer.flare.network/tx/0x10ff52e5bdc2e9c5a3a43c9bc8cd7a0d91e51b28d3c4a4b302a792064e697987
 [live]: https://scrip-production.up.railway.app
 
 ---
@@ -165,6 +168,20 @@ destination. Neither is sufficient alone.
 controlled and may levy a transfer fee, so `settle()` reads the payee balance
 before and after and reverts with `Underdelivered` if the payee received less
 than the invoice. A payment rail that silently underpays is a broken one.
+
+**An invoice is settled per payer, not per invoice.** `settled` is keyed on
+`(invoiceId, payer)`. Invoice IDs travel the x402 HTTP path in the clear, and
+keyed on the invoice alone anyone who saw one could settle their own payment
+against it first and burn it for the payer it was issued to - no funds at risk,
+since the intent binds payer, payee and amount, but the quote spent and the
+intended payer left holding a signature for something that could never settle.
+Keyed on the pair, a stranger's payment lands in a different slot and leaves the
+real one payable. It costs one keccak, about 870 gas.
+
+**A zero-amount intent is refused.** It moves nothing and delivers nothing, but
+it still occupies an invoice and still costs whoever relayed it their gas - which
+made it a way to burn invoice IDs at someone else's expense. Nothing downstream
+wants one either: the middleware only ever quotes a price above zero.
 
 **The permit call is wrapped in `try/catch`.** A front-runner can lift the permit
 out of the mempool and submit it directly, which consumes the nonce and makes a
@@ -410,23 +427,34 @@ Five properties, each asserted rather than asserted-about:
 |---|---|
 | FXRP | `0x0b6A3645c240605887a5532109323A3E12273dc7` |
 | AssetManagerFXRP | `0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA` |
-| ScripFacilitator | `0x43F672C0a915F59A2472a07D2108936e217cB04C` |
+| ScripFacilitator | `0x37A6D9C298B4b6E5Be17D4412B2Fc61097953e93` |
 
 [ScripFacilitator on the explorer][fac], source-verified. Deployed in block
-33930955, tx
-`0x2bf4a067e1cbfc75a560639a1157f5ae059d35158568df342f47a7777f152aa9`.
+34035433, tx
+`0xb94443db55961837444086b5e8cef9cafe71c6a0fe7ea78e22f2f7684d38d06e`.
 
-Two payments on live Coston2, both with the payer's C2FLR at zero before and
+This is the second deployment. The first, at
+`0x43F672C0a915F59A2472a07D2108936e217cB04C`, keyed `settled` on the invoice id
+alone and accepted zero-amount intents; both are closed here, and the reasoning
+is under [How a payment works](#how-a-payment-works). It is left on chain rather
+than pretended away - the payments below that predate the redeployment settled
+through it, and their receipts are real either way.
+
+Payments on live Coston2, every one with the payer's C2FLR at zero before and
 after:
 
-| Payment | Block | Gas | Transaction |
-|---|---|---|---|
-| 0.5 FXRP, direct | 33961376 | 222,790 | [`0x4bea1e37`][tx1] |
-| $0.25 via x402 | 33961951 | 205,702 | [`0x975a5ac6`][tx2] |
-| $0.25 via the MCP `pay` tool | 34018086 | 205,698 | [`0xeeef2e1d`][tx3] |
-| $0.25 against the hosted facilitator | 34022538 | 205,722 | [`0xe3cb0532`][tx4] |
+| Payment | Block | Gas | Transaction | Contract |
+|---|---|---|---|---|
+| 0.5 FXRP, direct | 33961376 | 222,790 | [`0x4bea1e37`][tx1] | first |
+| $0.25 via x402 | 33961951 | 205,702 | [`0x975a5ac6`][tx2] | first |
+| $0.25 via the MCP `pay` tool | 34018086 | 205,698 | [`0xeeef2e1d`][tx3] | first |
+| $0.25 against the hosted facilitator | 34022538 | 205,722 | [`0xe3cb0532`][tx4] | first |
+| $0.25, namespaced invoice | 34035592 | 206,561 | [`0x10ff52e5`][tx5] | **current** |
 
-[fac]: https://coston2-explorer.flare.network/address/0x43F672C0a915F59A2472a07D2108936e217cB04C
+The current contract costs about 870 more gas per settlement. That is the keccak
+that namespaces the invoice by payer, and it buys the close of the burn.
+
+[fac]: https://coston2-explorer.flare.network/address/0x37A6D9C298B4b6E5Be17D4412B2Fc61097953e93
 
 The testnet token reports its symbol as `FTestXRP` and its name as `FXRP`. Use
 the value the contract returns rather than assuming either.
@@ -579,14 +607,6 @@ nonce. EIP-3009's random nonces avoid this, and FXRP does not implement
 EIP-3009, so payments are serialised per payer today. The MCP server pays for one
 resource at a time for the same reason - paying for two means solving this, not
 calling `pay` twice.
-
-**Namespace invoice IDs per payer, in the contract.** `settled` is keyed on
-`invoiceId` alone, and invoice IDs travel the x402 HTTP path, so anyone who sees
-one can spend it first. The service already recovers from that: a payment against
-a spent invoice is answered with a fresh quote, and the client signs the new one
-and carries on. No funds were ever at risk either way, since the intent binds
-payer, payee and amount. Keying on `(invoiceId, payer)` closes it at the source,
-and costs nothing but a mapping key and a redeployment.
 
 **Mainnet FXRP.** Everything here is Coston2. The signing path is unchanged on
 mainnet, but the facilitator would need redeploying and auditing against the real

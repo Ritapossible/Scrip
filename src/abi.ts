@@ -32,7 +32,8 @@ export const facilitatorAbi = parseAbi([
   "function settle(PaymentIntent intent, Signature permitSig, Signature intentSig)",
   "function intentDigest(PaymentIntent intent) view returns (bytes32)",
   "function token() view returns (address)",
-  "function settled(bytes32) view returns (bool)",
+  "function settled(bytes32 invoiceId, address payer) view returns (bool)",
+  "function settlementKey(bytes32 invoiceId, address payer) pure returns (bytes32)",
   "event PaymentSettled(bytes32 indexed invoiceId, address indexed payer, address indexed payee, uint256 requested, uint256 delivered)",
   // Without these a revert decodes to a bare selector and every failure looks
   // the same.
@@ -45,6 +46,7 @@ export const facilitatorAbi = parseAbi([
   "error InsufficientAllowance(uint256 have, uint256 need)",
   "error TransferFailed()",
   "error ZeroPayee()",
+  "error ZeroAmount()",
 ]);
 
 /**
@@ -67,6 +69,8 @@ export function explainRevert(name: string, args: readonly unknown[]): string {
       return "FXRP's transferFrom failed or returned false.";
     case "ZeroPayee":
       return "the payee is the zero address.";
+    case "ZeroAmount":
+      return "the intent is for zero FXRP. A payment that moves nothing still occupies an invoice and still costs the relayer its gas, so it is refused.";
     case "MalleableSignature":
       return "a signature had a high-half-order s value. The signer is not normalising to EIP-2.";
     case "BadSignatureV":

@@ -164,12 +164,17 @@ export class Facilitator {
     }
   }
 
-  async isSettled(invoiceId: Hex): Promise<boolean> {
+  /**
+   * Has this payer settled this invoice? The pair is the question. The same
+   * invoice id in two different payers' hands is two different payments, and
+   * only one of them is the one being asked about.
+   */
+  async isSettled(invoiceId: Hex, payer: Address): Promise<boolean> {
     return this.client.readContract({
       address: this.address,
       abi: facilitatorAbi,
       functionName: "settled",
-      args: [invoiceId],
+      args: [invoiceId, payer],
     });
   }
 
@@ -217,7 +222,7 @@ export class Facilitator {
 
     const [block, alreadySettled, fxrp] = await Promise.all([
       this.client.getBlock(),
-      this.isSettled(intent.invoiceId),
+      this.isSettled(intent.invoiceId, intent.payer),
       this.fxrp(),
     ]);
 

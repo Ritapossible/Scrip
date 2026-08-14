@@ -23,7 +23,7 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { getAddress } from "viem";
 
 const ENV_PATH = new URL("../.env", import.meta.url);
-const FACILITATOR = "0x43F672C0a915F59A2472a07D2108936e217cB04C";
+const FACILITATOR = "0x37A6D9C298B4b6E5Be17D4412B2Fc61097953e93";
 const RPC_URL = "https://coston2-api.flare.network/ext/C/rpc";
 
 /** Minimal .env parser - enough for KEY=value, which is all this file ever is. */

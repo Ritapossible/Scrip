@@ -76,7 +76,8 @@ const facAbi = parseAbi([
   'struct PaymentIntent { bytes32 invoiceId; address payer; address payee; uint256 amount; uint256 deadline; }',
   'struct Signature { uint8 v; bytes32 r; bytes32 s; }',
   'function settle(PaymentIntent intent, Signature permitSig, Signature intentSig)',
-  'function settled(bytes32) view returns (bool)',
+  'function settled(bytes32 invoiceId, address payer) view returns (bool)',
+  'function settlementKey(bytes32 invoiceId, address payer) pure returns (bytes32)',
   'event PaymentSettled(bytes32 indexed invoiceId, address indexed payer, address indexed payee, uint256 requested, uint256 delivered)',
   // Without these viem cannot decode a revert and every failure looks identical.
   'error AlreadySettled(bytes32 invoiceId)',
@@ -88,6 +89,7 @@ const facAbi = parseAbi([
   'error InsufficientAllowance(uint256 have, uint256 need)',
   'error TransferFailed()',
   'error ZeroPayee()',
+  'error ZeroAmount()',
 ]);
 
 const split = (sig) => ({
@@ -243,6 +245,61 @@ try {
   ok(false, 'replay was rejected');
 } catch (e) {
   ok(/AlreadySettled/.test(e.message || ''), 'replay rejected with AlreadySettled');
+}
+
+// --- invoice burn ----------------------------------------------------------
+// `settled` is keyed on (invoiceId, payer), not on the invoice alone. Invoice
+// ids travel the x402 HTTP path in the clear, so keyed on the invoice by itself
+// anyone who saw one could settle their own payment against it first and burn it
+// for the payer it was issued to.
+//
+// The invoice above is settled, for `payer`. What matters is that it is settled
+// *only* for them: the same id in anyone else's hands is a different slot, still
+// open. That is the whole property - had the stranger gone first, the payer's
+// slot would have been the one still open, and the quote would still have been
+// payable.
+console.log('\nburn: the same invoice id in another payer\'s hands');
+ok(
+  (await pub.readContract({
+    address: FACILITATOR, abi: facAbi, functionName: 'settled', args: [invoiceId, payer.address],
+  })) === true,
+  'the invoice is settled for the payer who signed it',
+);
+ok(
+  (await pub.readContract({
+    address: FACILITATOR, abi: facAbi, functionName: 'settled', args: [invoiceId, thief.address],
+  })) === false,
+  'the same invoice id is untouched for anyone else - the burn is closed',
+);
+ok(
+  (await pub.readContract({
+    address: FACILITATOR, abi: facAbi, functionName: 'settlementKey', args: [invoiceId, payer.address],
+  })) !== (await pub.readContract({
+    address: FACILITATOR, abi: facAbi, functionName: 'settlementKey', args: [invoiceId, thief.address],
+  })),
+  'and the two settle under different keys, by construction',
+);
+
+// --- zero amount -----------------------------------------------------------
+// A zero-amount payment moves nothing and delivers nothing, but still occupies
+// an invoice and still costs whoever relayed it their gas.
+console.log('\nzero amount: a payment that moves nothing');
+const zeroInvoice = keccak256(toHex(`invoice-zero-${Date.now()}-${Math.random()}`));
+const zeroBlock = await pub.getBlock();
+const zeroDeadline = zeroBlock.timestamp + 3600n;
+const zeroIntent = { invoiceId: zeroInvoice, payer: payer.address, payee: PAYEE, amount: 0n, deadline: zeroDeadline };
+const zeroIntentSig = split(await payer.signTypedData({
+  domain: intentDomain, types: intentTypes, primaryType: 'PaymentIntent', message: zeroIntent,
+}));
+try {
+  await relayerWallet.writeContract({
+    address: FACILITATOR, abi: facAbi, functionName: 'settle',
+    // The permit is irrelevant: the amount is rejected before it is reached.
+    args: [zeroIntent, { v: 27, r: pad('0x0', { size: 32 }), s: pad('0x0', { size: 32 }) }, zeroIntentSig],
+  });
+  ok(false, 'zero-amount settlement was rejected');
+} catch (e) {
+  ok(/ZeroAmount/.test(e.message || ''), 'zero-amount settlement rejected with ZeroAmount');
 }
 
 // --- front-runner grief ----------------------------------------------------

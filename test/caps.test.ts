@@ -26,7 +26,7 @@ function quoteAt(usd: string): Quote {
     amount: 1_000_000n,
     amountFormatted: "1.000000",
     deadline: 0n,
-    facilitator: "0x43F672C0a915F59A2472a07D2108936e217cB04C",
+    facilitator: "0x37A6D9C298B4b6E5Be17D4412B2Fc61097953e93",
     rateUsd: 1,
     checks: [],
     fxrp: {

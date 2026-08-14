@@ -85,9 +85,19 @@ contract ScripFacilitator {
     bytes32 private immutable _cachedDomainSeparator;
     uint256 private immutable _cachedChainId;
 
-    /// Invoice IDs already paid. A signature stays valid until its deadline, so
-    /// without this a relayer could settle the same invoice twice.
-    mapping(bytes32 => bool) public settled;
+    /// Payments already made, keyed on (invoiceId, payer). A signature stays
+    /// valid until its deadline, so without this a relayer could settle the same
+    /// invoice twice.
+    ///
+    /// Keyed on the pair rather than the invoice alone because invoice IDs
+    /// travel the x402 HTTP path in the clear. Keyed on the invoice by itself,
+    /// anyone who saw one could settle their own payment against it first and
+    /// burn it for the payer it was issued to - no funds at risk, since the
+    /// intent binds payer, payee and amount, but the quote is spent and the
+    /// intended payer is left holding a signature for something that can never
+    /// settle. Namespacing by payer costs a hash and closes it: a stranger's
+    /// payment lands under a different key and leaves the real one payable.
+    mapping(bytes32 => bool) private _settled;
 
     event PaymentSettled(
         bytes32 indexed invoiceId,
@@ -98,6 +108,7 @@ contract ScripFacilitator {
     );
 
     error AlreadySettled(bytes32 invoiceId);
+    error ZeroAmount();
     error Underdelivered(uint256 requested, uint256 delivered);
     error Expired(uint256 deadline, uint256 nowTime);
     error IntentNotSignedByPayer(address recovered, address payer);
@@ -121,6 +132,19 @@ contract ScripFacilitator {
 
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
         return block.chainid == _cachedChainId ? _cachedDomainSeparator : _buildDomainSeparator();
+    }
+
+    /// The slot a payment occupies. Exposed so an offchain caller can ask about
+    /// a specific payer's invoice rather than inferring one from the other.
+    function settlementKey(bytes32 invoiceId, address payer) public pure returns (bytes32) {
+        return keccak256(abi.encode(invoiceId, payer));
+    }
+
+    /// Has this payer already settled this invoice? Two different payers holding
+    /// the same invoice ID are two different questions, and this answers the one
+    /// that was asked.
+    function settled(bytes32 invoiceId, address payer) external view returns (bool) {
+        return _settled[settlementKey(invoiceId, payer)];
     }
 
     /**
@@ -156,9 +180,17 @@ contract ScripFacilitator {
         Signature calldata intentSig
     ) external {
         if (intent.payee == address(0)) revert ZeroPayee();
+        // A zero-amount payment moves nothing and delivers nothing, but it still
+        // occupies an invoice and still costs whoever relayed it their gas. That
+        // made it a way to spend someone else's relayer on burning invoice IDs
+        // for free. Nothing downstream has a use for it either: the middleware
+        // only ever quotes a price above zero.
+        if (intent.amount == 0) revert ZeroAmount();
         if (block.timestamp > intent.deadline) revert Expired(intent.deadline, block.timestamp);
-        if (settled[intent.invoiceId]) revert AlreadySettled(intent.invoiceId);
-        settled[intent.invoiceId] = true; // effects before interactions
+
+        bytes32 key = settlementKey(intent.invoiceId, intent.payer);
+        if (_settled[key]) revert AlreadySettled(intent.invoiceId);
+        _settled[key] = true; // effects before interactions
 
         // --- the payee binding -------------------------------------------
         // Verified before anything is spent. Every settle() field that a

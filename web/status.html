@@ -136,6 +136,14 @@
                 <td>A spent invoice is answered with a fresh quote, and the client re-signs</td>
                 <td><span class="pill">working, live Coston2</span></td>
               </tr>
+              <tr>
+                <td>Invoice ids namespaced per payer - a stranger cannot burn a quote</td>
+                <td><span class="pill">live Coston2</span></td>
+              </tr>
+              <tr>
+                <td>Zero-amount settlements refused</td>
+                <td><span class="pill">live Coston2</span></td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -245,6 +253,13 @@ content-type: application/json
                 <td>
                   <a href="https://coston2-explorer.flare.network/tx/0xe3cb0532e8824c8ab780ddcacb637ed1aa4ed19a6646764787a63ad6e47d9098"><code>0xe3cb0532</code></a>
                   &middot; block 34022538 &middot; 205,722 gas
+                </td>
+              </tr>
+              <tr>
+                <td>A payment under the <strong>current</strong> contract, invoice namespaced per payer</td>
+                <td>
+                  <a href="https://coston2-explorer.flare.network/tx/0x10ff52e5bdc2e9c5a3a43c9bc8cd7a0d91e51b28d3c4a4b302a792064e697987"><code>0x10ff52e5</code></a>
+                  &middot; block 34035592 &middot; 206,561 gas
                 </td>
               </tr>
             </tbody>
@@ -358,18 +373,6 @@ front-runner replays the permit directly to FXRP
             </p>
           </li>
           <li>
-            <h3>Namespace invoice ids per payer, in the contract</h3>
-            <p>
-              <code>settled</code> is keyed on the invoice id alone, and invoice
-              ids travel the HTTP path, so anyone who sees one can spend it
-              first. The service already recovers from that - a payment against a
-              spent invoice is answered with a fresh quote, and the client signs
-              the new one and carries on - and no funds were ever at risk, since
-              the intent binds payer, payee and amount. Keying on the payer as
-              well closes it at the source, and costs nothing but a mapping key
-              and a redeployment.
-            </p>
-          </li>
           <li>
             <h3>Mainnet FXRP</h3>
             <p>
@@ -405,7 +408,7 @@ front-runner replays the permit directly to FXRP
           </div>
           <div class="footer-col">
             <h4>Onchain</h4>
-            <a href="https://coston2-explorer.flare.network/address/0x43F672C0a915F59A2472a07D2108936e217cB04C">Facilitator</a>
+            <a href="https://coston2-explorer.flare.network/address/0x37A6D9C298B4b6E5Be17D4412B2Fc61097953e93">Facilitator</a>
             <a href="https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7">FXRP token</a>
             <a href="https://faucet.flare.network/coston2">Coston2 faucet</a>
           </div>
