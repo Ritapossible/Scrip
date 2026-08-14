@@ -988,6 +988,60 @@ a.addr-value:hover {
     flex-direction: column;
     gap: 12px;
   }
+
+  /*
+   * Two columns of prose do not fit on a phone. Left as a table it either
+   * scrolls sideways - which hides the half that says whether a thing works - or
+   * squeezes both columns into a few words per line.
+   *
+   * So each row becomes a block: what the piece is, then its state underneath.
+   * The header row is dropped rather than repeated, because "Piece" and "State"
+   * only earn their space when the columns are side by side, and stacked rows
+   * are self-describing.
+   */
+  .table-wrap {
+    overflow-x: visible;
+  }
+
+  .doc table,
+  .doc tbody,
+  .doc tr,
+  .doc td {
+    display: block;
+    width: 100%;
+  }
+
+  .doc thead {
+    display: none;
+  }
+
+  .doc tr {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .doc tr:last-child {
+    border-bottom: none;
+  }
+
+  .doc td {
+    padding: 0;
+    border-bottom: none;
+  }
+
+  /* The name of the thing, then a gap, then its state. */
+  .doc td:first-child {
+    font-weight: 600;
+    margin-bottom: 9px;
+  }
+
+  /* A pill sized to its text wraps mid-phrase at this width; let it use the
+     row and keep the words together. */
+  .pill {
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+
   .steps li {
     padding: 56px 20px 20px;
   }
